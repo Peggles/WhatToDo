@@ -1,5 +1,5 @@
 # WhatToDo
-PowerShell to-do list module.
+A PowerShell to-do list module that uses the **todo.txt** format (https://github.com/todotxt/todo.txt).
 
 ----
 
