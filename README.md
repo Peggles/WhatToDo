@@ -5,8 +5,8 @@ PowerShell to-do list module.
 
 ### Get started ###
 1. Create a new directory that will store the configuration and task files.
-2. Run "Initialize-WhatToDo" and enter the path to the newly created directory.
-3. Run "Start-WhatToDo" and enter the path to the configuration file that was created in the WhatToDo directory.
+2. Run "Initialize-WhatToDo" and include the path to the newly created directory.
+3. Run "Start-WhatToDo" and include the path to the configuration file that was created in the WhatToDo directory.
 4. Enjoy productivity!
 
 ```powershell
