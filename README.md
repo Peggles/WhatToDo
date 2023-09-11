@@ -25,7 +25,7 @@ Start-WhatToDo -ConfigurationPath 'path\to\whattodo\directory\WhatToDo-Config.ps
 
 ### Set default parameter value to auto-include configuration file for Start-WhatToDo ###
 1. Edit your PS profile.
-2. Add the default parameter value anywhere in your PS profile.
+2. Add the default parameter value anywhere in the profile.
 
 ```powershell
 code $profile
@@ -35,7 +35,7 @@ code $profile
 $PSDefaultParameterValues['Start-WhatToDo:ConfigurationPath'] = 'path\to\whattodo\directory\WhatToDo-Config.psd1'
 ```
 
-Now you can run "Start-WhatToDo" without including a value for the ConfigurationPath parameter.
+Now you can run "Start-WhatToDo" without the ConfigurationPath parameter.
 ```powershell
 Start-WhatToDo
 ```
