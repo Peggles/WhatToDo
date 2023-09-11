@@ -48,7 +48,7 @@ function Start-WhatToDo {
         }
 
         $index = 0
-        $TaskList = [System.Collections.ArrayList](Get-SortedWhatToDoList -TaskList $TaskList)
+        $TaskList = [System.Collections.ArrayList](Get-WhatToDoSortedTaskList -TaskList $TaskList)
         $TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date } | ForEach-Object {
             $index++
             # Index.
@@ -373,7 +373,7 @@ function Import-WhatToDoTaskList {
     return $tempTaskList
 }
 
-function Get-SortedWhatToDoList {
+function Get-WhatToDoSortedTaskList {
     param(
         [Parameter(Mandatory)]
         [System.Collections.ArrayList]$TaskList
