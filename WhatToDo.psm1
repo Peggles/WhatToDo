@@ -310,7 +310,7 @@ Export-ModuleMember -Function Start-WhatToDo
 function Import-WhatToDoTaskList {
     param(
         [Parameter(Mandatory)]
-        [ValidateNotNullOrEmpty()]
+        [ValidateNotNull()]
         [string]$Path,
         [Parameter(Mandatory)]
         [DateTime]$Date
@@ -404,3 +404,47 @@ function Save-WhatToDoTaskList {
     }
     Set-Content -Path $FilePath -Value $content.Trim() -Encoding 'utf8'
 }
+
+function Initialize-WhatToDo {
+    param(
+        [Parameter(Mandatory)]
+        [ValidateScript({
+            if (Test-Path -Path $_ -PathType Container) { return $true }
+            else { throw "Cannot find the directory '$($_)'." }
+        })]
+        [string]$DirectoryPath
+    )
+
+    $taskListFilePath = Join-Path -Path $DirectoryPath -ChildPath 'tasks.todo'
+    $configFilePath = Join-Path -Path $DirectoryPath -ChildPath 'WhatToDo-Config.psd1'
+
+    if (!(Test-Path -Path $configFilePath)) {
+        $configFileContent = @"
+@{
+    TaskListFile = '$($taskListFilePath)'
+}
+"@
+        try {
+            New-Item -Path $configFilePath -ItemType File -Value $configFileContent -Confirm
+        }
+        catch {
+            throw "Failed to create configuration file in directory '$($DirectoryPath)'. $($Error[0])"
+        }
+
+        if (!(Test-Path -Path $taskListFilePath)) {
+            try {
+                New-Item -Path $taskListFilePath -ItemType File -Confirm
+            }
+            catch {
+                throw "Failed to create task list file in directory '$($DirectoryPath)'. $($Error[0])"
+            }
+        }
+        else {
+            Write-Error "WhatToDo task list already exists in that directory. Task list file path is '$($taskListFilePath)'."
+        }
+    }
+    else {
+        Write-Error "WhatToDo has already been set up in that directory. Configuration file path is '$($configFilePath)'."
+    }
+}
+Export-ModuleMember -Function Initialize-WhatToDo
