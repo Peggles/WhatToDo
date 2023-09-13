@@ -34,9 +34,18 @@ function Start-WhatToDo {
         elseif ((Get-Date $ListDate).Date -gt (Get-Date).Date) {
             $dateColor = 'Yellow'
         }
-        Write-Host (Get-Date $ListDate -Format 'yyyy-MM-dd') -NoNewline -ForegroundColor $dateColor
-        Write-Host " ($((Get-Date $ListDate).DayOfWeek))" -NoNewline -ForegroundColor DarkGray
-        Write-Host " $(Get-Date $ListDate -UFormat '%V')" -ForegroundColor DarkGray
+
+        if ((Get-Date $ListDate).Date -eq (Get-Date).Date) {
+            Write-Host 'Today ' -NoNewline
+        }
+        Write-Host "$((Get-Date $ListDate).DayOfWeek.ToString().Substring(0, 3)) " -NoNewline -ForegroundColor $dateColor
+        if ((Get-Date $ListDate).Year -eq (Get-Date).Year) {
+            Write-Host "$(Get-Date $ListDate -Format 'd\/M')" -NoNewline -ForegroundColor $dateColor
+        }
+        else {
+            Write-Host "$(Get-Date $ListDate -Format 'yyyy-MM-dd')" -NoNewline -ForegroundColor $dateColor
+        }
+        Write-Host " [$(Get-Date $ListDate -UFormat '%V')]" -ForegroundColor DarkGray
         Write-Host
 
         $overdueTasks = $TaskList | Where-Object {
@@ -46,7 +55,7 @@ function Start-WhatToDo {
 
         if (($overdueTasks | Measure-Object).Count -gt 0) {
             Write-Host ('-' * 20) -ForegroundColor DarkRed
-            Write-Host "Overdue tasks [$(($overdueTasks | Measure-Object).Count)]" -ForegroundColor DarkRed
+            Write-Host "Overdue tasks [$(($overdueTasks | Measure-Object).Count)]" -ForegroundColor Red
             $overdueTasks | ForEach-Object {
                 Write-Host "$($_.Description) ($(Get-Date $_.DueDate -Format 'd\/M'))" -ForegroundColor DarkGray
             }
@@ -55,7 +64,8 @@ function Start-WhatToDo {
         }
 
         $index = 0
-        $TaskList = [System.Collections.ArrayList](Get-WhatToDoSortedTaskList -TaskList $TaskList)
+        # $TaskList = [System.Collections.ArrayList](Get-WhatToDoSortedTaskList -TaskList $TaskList)
+        $TaskList = [System.Collections.ArrayList]($TaskList | Sort-Object -Property Completed, Priority, EstimateMinutes, CreationDate, Description)
         $TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date } | ForEach-Object {
             $index++
             # Index.
@@ -114,7 +124,20 @@ function Start-WhatToDo {
                     $remainingEstimateMinutes += $_.EstimateMinutes
                 }
             }
-            Write-Host "$([Math]::Round($remainingEstimateMinutes / 60, 1))h / $([Math]::Round($totalEstimateMinutes / 60, 1))h" -ForegroundColor DarkGreen
+
+            $remainingEstimateHours = [Math]::Floor($remainingEstimateMinutes / 60)
+            $remainingEstimateMinutes -= $remainingEstimateHours * 60
+            if ($remainingEstimateHours -gt 0) {
+                Write-Host "$($remainingEstimateHours)h " -NoNewline -ForegroundColor DarkGreen
+            }
+            Write-Host "$($remainingEstimateMinutes)m / " -NoNewline -ForegroundColor DarkGreen
+
+            $totalEstimateHours = [Math]::Floor($totalEstimateMinutes / 60)
+            $totalEstimateMinutes -= $totalEstimateHours * 60
+            if ($totalEstimateHours -gt 0) {
+                Write-Host "$($totalEstimateHours)h " -NoNewline -ForegroundColor DarkGreen
+            }
+            Write-Host "$($totalEstimateMinutes)m" -ForegroundColor DarkGreen
         }
 
         Write-Host
@@ -131,42 +154,16 @@ function Start-WhatToDo {
             })
             Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
         }
-        # elseif ($UserCommand -match '^edit (\d+) ([a-zA-Z]) (\d+) (.+)$') {
-        #     $tempIndex = $Matches.1
-        #     $currentTasks = ($TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date })
-
-        #     if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
-        #         $task = [PSCustomObject]$currentTasks[$tempIndex-1]
-        #         $oldDescription = $task.Description
-        #         $TaskList = [System.Collections.ArrayList]($TaskList | Where-Object { $_ -ne $task })
-        #         $task.Priority = ($Matches.2).ToUpper()
-        #         $task.EstimateMinutes = $Matches.3
-        #         $task.Description = $Matches.4
-        #         $TaskList.Add($task)
-        #         Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
-        #         $MessageList.Add("Edited task '$($oldDescription)'.")
-        #     }
-        #     else {
-        #         $MessageList.Add("Invalid task index: $($tempIndex)")
-        #     }
-        # }
-        # elseif ($UserCommand -match '^edit (\d+) (.+)$') {
-        #     $tempIndex = $Matches.1
-        #     $currentTasks = ($TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date })
-
-        #     if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
-        #         $task = [PSCustomObject]$currentTasks[$tempIndex-1]
-        #         $oldDescription = $task.Description
-        #         $TaskList = [System.Collections.ArrayList]($TaskList | Where-Object { $_ -ne $task })
-        #         $task.Description = $Matches.2
-        #         $TaskList.Add($task)
-        #         Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
-        #         $MessageList.Add("Edited task '$($oldDescription)'.")
-        #     }
-        #     else {
-        #         $MessageList.Add("Invalid task index: $($tempIndex)")
-        #     }
-        # }
+        elseif ($UserCommand -match '^add ([a-zA-Z]) (\d+[\.,]?5?)h (.+)$') {
+            [void]$TaskList.Add([PSCustomObject]@{
+                Priority = ($Matches.1).ToUpper()
+                EstimateMinutes = [float]($Matches.2).Replace(',', '.') * 60
+                Description = ($Matches.3).Trim()
+                CreationDate = Get-Date
+                DueDate = Get-Date $ListDate
+            })
+            Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
+        }
         elseif ($UserCommand -match '^edit (\d+)$') {
             $tempIndex = $Matches.1
             $currentTasks = ($TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date })
@@ -318,10 +315,17 @@ function Start-WhatToDo {
             } | Sort-Object -Property DueDate, Priority, CreationDate, Description
 
             if (($futureTasks | Measure-Object).Count -gt 0) {
-                Write-Host "Future tasks within 14 days [$(($futureTasks | Measure-Object).Count)]" -ForegroundColor DarkCyan
+                Write-Host "Tasks within 14 days [$(($futureTasks | Measure-Object).Count)]" -ForegroundColor DarkCyan
                 $futureTasks | ForEach-Object {
-                    Write-Host "- $($_.Description)" -NoNewline
-                    Write-Host " ($((Get-Date $_.DueDate).DayOfWeek.ToString().Substring(0, 3)) $(Get-Date $_.DueDate -Format 'd\/M'))" -ForegroundColor DarkYellow
+                    if ((Get-Date $_.DueDate).Date -eq (Get-Date).Date.AddDays(1)) {
+                        # Tomorrow.
+                        Write-Host "- $($_.Description)" -NoNewline
+                        Write-Host " (Tomorrow, $((Get-Date $_.DueDate).DayOfWeek.ToString().Substring(0, 3)) $(Get-Date $_.DueDate -Format 'd\/M'))" -ForegroundColor DarkGreen
+                    }
+                    else {
+                        Write-Host "- $($_.Description)" -NoNewline
+                        Write-Host " ($((Get-Date $_.DueDate).DayOfWeek.ToString().Substring(0, 3)) $(Get-Date $_.DueDate -Format 'd\/M'))" -ForegroundColor DarkYellow
+                    }
                 }
             }
             else {
@@ -412,15 +416,6 @@ function Import-WhatToDoTaskList {
     }
 
     return $tempTaskList
-}
-
-function Get-WhatToDoSortedTaskList {
-    param(
-        [Parameter(Mandatory)]
-        [System.Collections.ArrayList]$TaskList
-    )
-
-    return ($TaskList | Sort-Object -Property Completed, Priority, EstimateMinutes, CreationDate, Description)
 }
 
 function Save-WhatToDoTaskList {
