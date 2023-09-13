@@ -10,10 +10,17 @@ function Start-WhatToDo {
 
     $ScriptConfig = Import-PowerShellDataFile -Path $ConfigurationPath -ErrorAction Stop
     $ExitScript = $false
+    $MessageList = [System.Collections.Generic.List[string]]@()
     $ListDate = Get-Date
     $TaskList = New-Object -TypeName 'System.Collections.ArrayList'
     $TaskList = [System.Collections.ArrayList](Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate)
-    $MessageList = [System.Collections.Generic.List[string]]@()
+
+    # Get-WhatToDoRecurringTasks -RecurringTasksConfig $ScriptConfig.RecurringTasks | ForEach-Object {
+    #     $tempTask = $_
+    #     if ((($TaskList | Where-Object { ($_.Description -eq $tempTask.Description) -and ($_.DueDate -eq $tempTask.DueDate) }) | Measure-Object).Count -eq 0) {
+    #         $TaskList.Add($tempTask)
+    #     }
+    # }
 
     while (!$ExitScript) {
         Clear-Host
@@ -58,7 +65,7 @@ function Start-WhatToDo {
 
             # Priority/completed.
             if ($_.Completed) {
-                Write-Host 'DONE' -NoNewline -ForegroundColor Yellow
+                Write-Host 'DONE' -NoNewline -ForegroundColor DarkGreen
             }
             else {
                 Write-Host $_.Priority -NoNewline -ForegroundColor Yellow
@@ -66,11 +73,21 @@ function Start-WhatToDo {
             Write-Host ' - ' -NoNewline -ForegroundColor DarkGray
 
             # Description.
-            Write-Host $_.Description -NoNewline
+            if ($_.Completed) {
+                Write-Host $_.Description -NoNewline -ForegroundColor DarkGray
+            }
+            else {
+                Write-Host $_.Description -NoNewline
+            }
             Write-Host ' (' -NoNewline -ForegroundColor DarkGray
 
             # Time estimate.
-            Write-Host $_.EstimateMinutes -NoNewline -ForegroundColor Green
+            if ($_.Completed) {
+                Write-Host $_.EstimateMinutes -NoNewline -ForegroundColor DarkGray
+            }
+            else {
+                Write-Host $_.EstimateMinutes -NoNewline -ForegroundColor Green
+            }
             Write-Host ')' -ForegroundColor DarkGray
         }
 
@@ -86,6 +103,20 @@ function Start-WhatToDo {
         }
         $MessageList.Clear()
 
+        if ($index -gt 0) {
+            Write-Host
+            Write-Host 'Total: ' -NoNewline -ForegroundColor DarkGreen
+            $totalEstimateMinutes = 0
+            $remainingEstimateMinutes = 0
+            $TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date } | ForEach-Object {
+                $totalEstimateMinutes += $_.EstimateMinutes
+                if (!$_.Completed) {
+                    $remainingEstimateMinutes += $_.EstimateMinutes
+                }
+            }
+            Write-Host "$([Math]::Round($remainingEstimateMinutes / 60, 1))h / $([Math]::Round($totalEstimateMinutes / 60, 1))h" -ForegroundColor DarkGreen
+        }
+
         Write-Host
         $UserCommand = Read-Host '$'
         Write-Host
@@ -99,39 +130,63 @@ function Start-WhatToDo {
                 DueDate = Get-Date $ListDate
             })
             Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
-            $MessageList.Add("Added task '$(($Matches.3).Trim())'.")
         }
-        elseif ($UserCommand -match '^edit (\d+) ([a-zA-Z]) (\d+) (.+)$') {
+        # elseif ($UserCommand -match '^edit (\d+) ([a-zA-Z]) (\d+) (.+)$') {
+        #     $tempIndex = $Matches.1
+        #     $currentTasks = ($TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date })
+
+        #     if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
+        #         $task = [PSCustomObject]$currentTasks[$tempIndex-1]
+        #         $oldDescription = $task.Description
+        #         $TaskList = [System.Collections.ArrayList]($TaskList | Where-Object { $_ -ne $task })
+        #         $task.Priority = ($Matches.2).ToUpper()
+        #         $task.EstimateMinutes = $Matches.3
+        #         $task.Description = $Matches.4
+        #         $TaskList.Add($task)
+        #         Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
+        #         $MessageList.Add("Edited task '$($oldDescription)'.")
+        #     }
+        #     else {
+        #         $MessageList.Add("Invalid task index: $($tempIndex)")
+        #     }
+        # }
+        # elseif ($UserCommand -match '^edit (\d+) (.+)$') {
+        #     $tempIndex = $Matches.1
+        #     $currentTasks = ($TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date })
+
+        #     if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
+        #         $task = [PSCustomObject]$currentTasks[$tempIndex-1]
+        #         $oldDescription = $task.Description
+        #         $TaskList = [System.Collections.ArrayList]($TaskList | Where-Object { $_ -ne $task })
+        #         $task.Description = $Matches.2
+        #         $TaskList.Add($task)
+        #         Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
+        #         $MessageList.Add("Edited task '$($oldDescription)'.")
+        #     }
+        #     else {
+        #         $MessageList.Add("Invalid task index: $($tempIndex)")
+        #     }
+        # }
+        elseif ($UserCommand -match '^edit (\d+)$') {
             $tempIndex = $Matches.1
             $currentTasks = ($TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date })
 
             if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                 $task = [PSCustomObject]$currentTasks[$tempIndex-1]
-                $oldDescription = $task.Description
-                $TaskList = [System.Collections.ArrayList]($TaskList | Where-Object { $_ -ne $task })
-                $task.Priority = ($Matches.2).ToUpper()
-                $task.EstimateMinutes = $Matches.3
-                $task.Description = $Matches.4
-                $TaskList.Add($task)
-                Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
-                $MessageList.Add("Edited task '$($oldDescription)'.")
-            }
-            else {
-                $MessageList.Add("Invalid task index: $($tempIndex)")
-            }
-        }
-        elseif ($UserCommand -match '^edit (\d+) (.+)$') {
-            $tempIndex = $Matches.1
-            $currentTasks = ($TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date })
+                $newPriority = Read-Host 'New priority'
+                $newEstimate = Read-Host 'New estimate'
+                $newDescription = Read-Host 'New description'
 
-            if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
-                $task = [PSCustomObject]$currentTasks[$tempIndex-1]
-                $oldDescription = $task.Description
-                $TaskList = [System.Collections.ArrayList]($TaskList | Where-Object { $_ -ne $task })
-                $task.Description = $Matches.2
-                $TaskList.Add($task)
+                if (![string]::IsNullOrWhiteSpace($newPriority)) {
+                    ($TaskList | Where-Object { $_ -eq $task }).Priority = $newPriority.Trim().ToUpper()
+                }
+                if (![string]::IsNullOrWhiteSpace($newEstimate)) {
+                    ($TaskList | Where-Object { $_ -eq $task }).EstimateMinutes = $newEstimate.Trim()
+                }
+                if (![string]::IsNullOrWhiteSpace($newDescription)) {
+                    ($TaskList | Where-Object { $_ -eq $task }).Description = $newDescription.Trim()
+                }
                 Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
-                $MessageList.Add("Edited task '$($oldDescription)'.")
             }
             else {
                 $MessageList.Add("Invalid task index: $($tempIndex)")
@@ -143,9 +198,8 @@ function Start-WhatToDo {
 
             if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                 $task = [PSCustomObject]$currentTasks[$tempIndex-1]
-                $TaskList = [System.Collections.ArrayList]($TaskList | Where-Object { $_ -ne $task })
+                $TaskList.Remove(($TaskList | Where-Object { $_ -eq $task }))
                 Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
-                $MessageList.Add("Removed task '$($task.Description)'.")
             }
             else {
                 $MessageList.Add("Invalid task index: $($tempIndex)")
@@ -158,12 +212,9 @@ function Start-WhatToDo {
             if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                 $task = [PSCustomObject]$currentTasks[$tempIndex-1]
                 if (!$task.Completed) {
-                    $TaskList = [System.Collections.ArrayList]($TaskList | Where-Object { $_ -ne $task })
-                    $task.Completed = $true
-                    $task.CompletionDate = Get-Date
-                    $TaskList.Add($task)
+                    ($TaskList | Where-Object { $_ -eq $task }).Completed = $true
+                    ($TaskList | Where-Object { $_ -eq $task }).CompletionDate = Get-Date
                     Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
-                    $MessageList.Add("Completed task '$($task.Description)'.")
                 }
                 else {
                     $MessageList.Add('That task is already completed.')
@@ -180,12 +231,9 @@ function Start-WhatToDo {
             if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                 $task = [PSCustomObject]$currentTasks[$tempIndex-1]
                 if ($task.Completed) {
-                    $TaskList = [System.Collections.ArrayList]($TaskList | Where-Object { $_ -ne $task })
-                    $task.Completed = $false
-                    $task.CompletionDate = $null
-                    $TaskList.Add($task)
+                    ($TaskList | Where-Object { $_ -eq $task }).Completed = $false
+                    ($TaskList | Where-Object { $_ -eq $task }).CompletionDate = $null
                     Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
-                    $MessageList.Add("Un-completed task '$($task.Description)'.")
                 }
                 else {
                     $MessageList.Add("That task isn't completed.")
@@ -201,12 +249,8 @@ function Start-WhatToDo {
             $currentTasks = ($TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date })
             if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                 $task = [PSCustomObject]$currentTasks[$tempIndex-1]
-                $TaskList | Where-Object { $_ -eq $task } | ForEach-Object {
-                    $_.DueDate = $newDueDate
-                    $_.DueDate
-                }
+                ($TaskList | Where-Object { $_ -eq $task }).DueDate = $newDueDate
                 Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
-                $MessageList.Add("Moved task '$($task.Description)' to $(Get-Date $newDueDate -Format 'yyyy-MM-dd').")
             }
             else {
                 $MessageList.Add("Invalid task index: $($tempIndex)")
@@ -218,12 +262,8 @@ function Start-WhatToDo {
             $currentTasks = ($TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date })
             if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                 $task = [PSCustomObject]$currentTasks[$tempIndex-1]
-                $TaskList | Where-Object { $_ -eq $task } | ForEach-Object {
-                    $_.DueDate = $newDueDate
-                    $_.DueDate
-                }
+                ($TaskList | Where-Object { $_ -eq $task }).DueDate = $newDueDate
                 Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
-                $MessageList.Add("Moved task '$($task.Description)' to $(Get-Date $newDueDate -Format 'yyyy-MM-dd').")
             }
             else {
                 $MessageList.Add("Invalid task index: $($tempIndex)")
@@ -246,12 +286,8 @@ function Start-WhatToDo {
             $currentTasks = ($TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date })
             if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                 $task = [PSCustomObject]$currentTasks[$tempIndex-1]
-                $TaskList | Where-Object { $_ -eq $task } | ForEach-Object {
-                    $_.DueDate = $newDueDate
-                    $_.DueDate
-                }
+                ($TaskList | Where-Object { $_ -eq $task }).DueDate = $newDueDate
                 Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
-                $MessageList.Add("Moved task '$($task.Description)' to $(Get-Date $newDueDate -Format 'yyyy-MM-dd').")
             }
             else {
                 $MessageList.Add("Invalid task index: $($tempIndex)")
@@ -276,7 +312,9 @@ function Start-WhatToDo {
         }
         elseif (($UserCommand -eq 'calendar') -or ($UserCommand -eq 'cal')) {
             $futureTasks = $TaskList | Where-Object {
-                $_.DueDate.Date -gt (Get-Date) -and $_.DueDate -le (Get-Date).AddDays(14)
+                ($_.DueDate.Date -gt (Get-Date)) -and
+                ($_.DueDate -le (Get-Date).AddDays(14)) -and
+                (!$_.Completed)
             } | Sort-Object -Property DueDate, Priority, CreationDate, Description
 
             if (($futureTasks | Measure-Object).Count -gt 0) {
@@ -291,6 +329,9 @@ function Start-WhatToDo {
             }
             Write-Host
             Read-Host 'Press <Enter> to exit calendar view'
+        }
+        elseif (($UserCommand -eq 'directory') -or ($UserCommand -eq 'dir')) {
+            Invoke-Item (Split-Path -Path $ScriptConfig.TaskListFile -Parent)
         }
         elseif ($UserCommand -eq 'save') {
             Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
@@ -448,3 +489,62 @@ function Initialize-WhatToDo {
     }
 }
 Export-ModuleMember -Function Initialize-WhatToDo
+
+function Get-WhatToDoRecurringTasks {
+    param(
+        [Parameter(Mandatory)]
+        $RecurringTasksConfig
+    )
+
+    #TODO: Implement recurring tasks.
+
+    $tempTaskList = New-Object -TypeName 'System.Collections.ArrayList'
+
+    foreach ($task in $RecurringTasksConfig) {
+        if ($task.Time.Month) {
+            Write-Host "Month: $($task.Time.Month)"
+        }
+
+        if ($task.Time.DayOfMonth) {
+            Write-Host "Day of month: $($task.Time.DayOfMonth)"
+        }
+
+        if ($task.Time.Weekday) {
+            Write-Host "Weekday: $($task.Time.Weekday)"
+        }
+
+        if ($task.Time.FirstWeekdayOfMonth) {
+            Write-Host "First weekday of month: $($task.Time.FirstWeekdayOfMonth)"
+        }
+
+        if ($task.Time.SecondWeekdayOfMonth) {
+            Write-Host "Second weekday of month: $($task.Time.SecondWeekdayOfMonth)"
+        }
+
+        if ($task.Time.ThirdWeekdayOfMonth) {
+            Write-Host "Third weekday of month: $($task.Time.ThirdWeekdayOfMonth)"
+        }
+
+        if ($task.Time.FourthWeekdayOfMonth) {
+            Write-Host "Fourth weekday of month: $($task.Time.FourthWeekdayOfMonth)"
+        }
+
+        try {
+            [void]$tempTaskList.Add([PSCustomObject]@{
+                Completed = $false
+                Priority = $task.Task.Priority.ToUpper()
+                CompletionDate = $null
+                Description = $task.Task.Description
+                EstimateMinutes = $task.Task.EstimateMinutes
+                CreationDate = Get-Date
+                DueDate = Get-Date
+            })
+        }
+        catch {
+            #TODO
+        }
+    }
+
+    Read-Host 'DEBUG'
+    return $tempTaskList
+}
