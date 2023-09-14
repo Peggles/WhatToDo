@@ -683,7 +683,7 @@ function Get-WhatToDoRecurringTasks {
         if ($task.DueDate.FourthWeekdayOfMonth) {
             $configuredDueDateSettings++
             if (((Get-Date).Day -gt 21) -and
-                ((Get-Date).DayOfWeek -in $task.DueDate.LastWeekdayOfMonth)) {
+                ((Get-Date).DayOfWeek -in $task.DueDate.FourthWeekdayOfMonth)) {
                 $matchingDueDateSettings++
             }
         }
