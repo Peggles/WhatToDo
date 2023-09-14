@@ -15,12 +15,16 @@ function Start-WhatToDo {
     $TaskList = New-Object -TypeName 'System.Collections.ArrayList'
     $TaskList = [System.Collections.ArrayList](Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate)
 
-    # Get-WhatToDoRecurringTasks -RecurringTasksConfig $ScriptConfig.RecurringTasks | ForEach-Object {
-    #     $tempTask = $_
-    #     if ((($TaskList | Where-Object { ($_.Description -eq $tempTask.Description) -and ($_.DueDate -eq $tempTask.DueDate) }) | Measure-Object).Count -eq 0) {
-    #         $TaskList.Add($tempTask)
-    #     }
-    # }
+    $recurringTasks = Get-WhatToDoRecurringTasks -TaskList $TaskList -RecurringTasksConfig $ScriptConfig.RecurringTasks
+    if (($recurringTasks | Measure-Object).Count -gt 0) {
+            $recurringTasks | ForEach-Object {
+            $tempTask = $_
+            if ((($TaskList | Where-Object { ($_.Description -eq $tempTask.Description) -and ($_.DueDate -eq $tempTask.DueDate) }) | Measure-Object).Count -eq 0) {
+                $TaskList.Add($tempTask)
+            }
+        }
+        Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
+    }
 
     while (!$ExitScript) {
         Clear-Host
@@ -54,7 +58,7 @@ function Start-WhatToDo {
             Write-Host ('-' * 20) -ForegroundColor DarkGray
             Write-Host "Overdue tasks [$(($overdueTasks | Measure-Object).Count)]" -ForegroundColor Red
 
-            $overdueTasks | ForEach-Object {
+            $overdueTasks | Where-Object { $_.Description.Length -gt 0 } | ForEach-Object {
                 Write-Host '- ' -NoNewline -ForegroundColor Gray
                 Write-Host "$($_.Description)" -NoNewline
                 Write-Host " ($((Get-Date $_.DueDate).DayOfWeek.ToString().Substring(0, 3)) $(Get-Date $_.DueDate -Format 'd\/M'))" -ForegroundColor DarkGray
@@ -65,7 +69,10 @@ function Start-WhatToDo {
         }
 
         $index = 0
-        $TaskList = [System.Collections.ArrayList]($TaskList | Sort-Object -Property Completed, Priority, EstimateMinutes, CreationDate, Description)
+        # Convert task list to array list and sort it (if it contains more than 1, otherwise skip conversion).
+        if (($TaskList | Measure-Object).Count -gt 1) {
+            $TaskList = [System.Collections.ArrayList]($TaskList | Sort-Object -Property Completed, Priority, EstimateMinutes, CreationDate, Description)
+        }
         $TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date } | ForEach-Object {
             $index++
             Write-Host '[' -NoNewline -ForegroundColor DarkGray
@@ -74,22 +81,22 @@ function Start-WhatToDo {
 
             $estimateHours = [Math]::Floor($_.EstimateMinutes / 60)
             $estimateMinutes = $_.EstimateMinutes - ($estimateHours * 60)
-            if (($estimateHours -gt 0) -and ($estimateMinutes -gt 0)) {
-                $estimateTimeText = "$($estimateHours)h $($estimateMinutes)m"
-            }
-            elseif ($estimateHours -gt 0) {
-                $estimateTimeText = "$($estimateHours)h"
-            }
-            elseif ($estimateMinutes -ge 0) {
-                $estimateTimeText = "$($estimateMinutes)m"
-            }
 
             if ($_.Completed) {
                 Write-Host 'DONE' -NoNewline -ForegroundColor DarkGreen
                 Write-Host ' - ' -NoNewline -ForegroundColor DarkGray
                 Write-Host $_.Description -NoNewline -ForegroundColor DarkGray
                 Write-Host ' (' -NoNewline -ForegroundColor DarkGray
-                Write-Host $estimateTimeText -NoNewline -ForegroundColor DarkGray
+                if (($estimateHours -gt 0) -and ($estimateMinutes -gt 0)) {
+                    Write-Host "$($estimateHours)h " -NoNewline -ForegroundColor DarkGray
+                    Write-Host "$($estimateMinutes)m" -NoNewline -ForegroundColor DarkGray
+                }
+                elseif ($estimateHours -gt 0) {
+                    Write-Host "$($estimateHours)h" -NoNewline -ForegroundColor DarkGray
+                }
+                elseif ($estimateMinutes -ge 0) {
+                    Write-Host "$($estimateMinutes)m" -NoNewline -ForegroundColor DarkGray
+                }
                 Write-Host ')' -ForegroundColor DarkGray
             }
             else {
@@ -97,14 +104,23 @@ function Start-WhatToDo {
                 Write-Host ' - ' -NoNewline -ForegroundColor DarkGray
                 Write-Host $_.Description -NoNewline
                 Write-Host ' (' -NoNewline -ForegroundColor DarkGray
-                Write-Host $estimateTimeText -NoNewline -ForegroundColor Green
+                if (($estimateHours -gt 0) -and ($estimateMinutes -gt 0)) {
+                    Write-Host "$($estimateHours)h " -NoNewline -ForegroundColor Green
+                    Write-Host "$($estimateMinutes)m" -NoNewline -ForegroundColor Green
+                }
+                elseif ($estimateHours -gt 0) {
+                    Write-Host "$($estimateHours)h" -NoNewline -ForegroundColor Green
+                }
+                elseif ($estimateMinutes -ge 0) {
+                    Write-Host "$($estimateMinutes)m" -NoNewline -ForegroundColor Green
+                }
                 Write-Host ')' -ForegroundColor DarkGray
             }
         }
 
         if ($index -gt 0) {
             Write-Host
-            Write-Host 'Total: ' -NoNewline -ForegroundColor DarkGreen
+            Write-Host 'Remaining: ' -NoNewline -ForegroundColor Gray
 
             $totalEstimateMinutes = 0
             $remainingEstimateMinutes = 0
@@ -118,7 +134,8 @@ function Start-WhatToDo {
             $remainingEstimateMinutes -= $remainingEstimateHours * 60
 
             if (($remainingEstimateHours -gt 0 -and $remainingEstimateMinutes -gt 0)) {
-                Write-Host "$($remainingEstimateHours)h $($remainingEstimateMinutes)m" -NoNewline -ForegroundColor DarkGreen
+                Write-Host "$($remainingEstimateHours)h " -NoNewline -ForegroundColor DarkGreen
+                Write-Host "$($remainingEstimateMinutes)m" -NoNewline -ForegroundColor DarkGreen
             }
             elseif ($remainingEstimateHours -gt 0) {
                 Write-Host "$($remainingEstimateHours)h" -NoNewline -ForegroundColor DarkGreen
@@ -132,13 +149,13 @@ function Start-WhatToDo {
             $totalEstimateMinutes -= $totalEstimateHours * 60
 
             if (($totalEstimateHours -gt 0) -and ($totalEstimateMinutes -gt 0)) {
-                Write-Host "$($totalEstimateHours)h $($totalEstimateMinutes)m" -NoNewline -ForegroundColor DarkGreen
+                Write-Host "$($totalEstimateHours)h $($totalEstimateMinutes)m" -NoNewline -ForegroundColor DarkGray
             }
             elseif ($totalEstimateHours -gt 0) {
-                Write-Host "$($totalEstimateHours)h" -NoNewline -ForegroundColor DarkGreen
+                Write-Host "$($totalEstimateHours)h" -NoNewline -ForegroundColor DarkGray
             }
             elseif ($totalEstimateMinutes -ge 0) {
-                Write-Host "$($totalEstimateMinutes)m" -NoNewline -ForegroundColor DarkGreen
+                Write-Host "$($totalEstimateMinutes)m" -NoNewline -ForegroundColor DarkGray
             }
             Write-Host
         }
@@ -210,8 +227,13 @@ function Start-WhatToDo {
 
                 if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                     $task = [PSCustomObject]$currentTasks[$tempIndex-1]
-                    $TaskList.Remove(($TaskList | Where-Object { $_ -eq $task }))
-                    Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
+                    if (!$task.Completed) {
+                        $TaskList.Remove(($TaskList | Where-Object { $_ -eq $task }))
+                        Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
+                    }
+                    else {
+                        $MessageList.Add('Cannot remove a completed task.')
+                    }
                 }
                 else {
                     $MessageList.Add("Invalid task index: $($tempIndex)")
@@ -354,14 +376,88 @@ function Start-WhatToDo {
             elseif (($UserCommand -eq 'directory') -or ($UserCommand -eq 'dir')) {
                 Invoke-Item (Split-Path -Path $ScriptConfig.TaskListFile -Parent)
             }
-            elseif ($UserCommand -eq 'save') {
-                Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
+            # elseif ($UserCommand -eq 'save') {
+            #     Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
+            # }
+            elseif ($UserCommand -eq 'help') {
+                Write-Host "### Help ###" -ForegroundColor DarkCyan
+
+                Write-Host "`n# Add a task" -ForegroundColor DarkYellow
+                Write-Host 'Syntax: add <priority> <estimate_time> <description>' -ForegroundColor DarkGray
+                Write-Host 'add a 15 Test task' -NoNewline
+                Write-Host " # Add a task with priority 'A', estimate time of 15 minutes, and description 'Test task'." -ForegroundColor DarkGreen
+                Write-Host 'add b 1h Another test task' -NoNewline
+                Write-Host " # Add a task with priority 'B', estimate time of 1 hour, and description 'Another test task'." -ForegroundColor DarkGreen
+                Write-Host 'add c 2.5h Yet another test task' -NoNewline
+                Write-Host " # Add a task with priority 'C', estimate time of 2.5 hours, and description 'Yet another test task'." -ForegroundColor DarkGreen
+
+                Write-Host "`n# Edit a task" -ForegroundColor DarkYellow
+                Write-Host 'Syntax: edit <index>' -ForegroundColor DarkGray
+                Write-Host 'edit 2' -NoNewline
+                Write-Host " # Edit task number 2." -ForegroundColor DarkGreen
+
+                Write-Host "`n# Remove a task" -ForegroundColor DarkYellow
+                Write-Host 'Syntax: remove <index>' -ForegroundColor DarkGray
+                Write-Host 'remove 1' -NoNewline
+                Write-Host " # Remove task number 1." -ForegroundColor DarkGreen
+
+                Write-Host "`n# Complete a task" -ForegroundColor DarkYellow
+                Write-Host 'Syntax: done <index>' -ForegroundColor DarkGray
+                Write-Host 'done 4' -NoNewline
+                Write-Host " # Complete task number 4." -ForegroundColor DarkGreen
+
+                Write-Host "`n# Un-complete a task" -ForegroundColor DarkYellow
+                Write-Host 'Syntax: undone <index>' -ForegroundColor DarkGray
+                Write-Host 'undone 4' -NoNewline
+                Write-Host " # Un-complete task number 4." -ForegroundColor DarkGreen
+
+                Write-Host "`n# Move a task to another day" -ForegroundColor DarkYellow
+                Write-Host 'Syntax: move <index> <yyyy-MM-dd>' -ForegroundColor DarkGray
+                Write-Host 'Syntax: move <index> <dd>' -ForegroundColor DarkGray
+                Write-Host 'Syntax: move <index>' -ForegroundColor DarkGray
+                Write-Host 'move 1 2024-01-25' -NoNewline
+                Write-Host ' # Move task number 1 to date 2024-01-25.' -ForegroundColor DarkGreen
+                Write-Host 'move 5 11' -NoNewline
+                Write-Host ' # Move task number 5 to day 11 (of current month).' -ForegroundColor DarkGreen
+                Write-Host 'move 3' -NoNewline
+                Write-Host ' # Move task number 3 to next workday.' -ForegroundColor DarkGreen
+
+                Write-Host "`n# Load another day's task list" -ForegroundColor DarkYellow
+                Write-Host 'Syntax: load <yyyy-MM-dd>' -ForegroundColor DarkGray
+                Write-Host 'Syntax: load <dd>' -ForegroundColor DarkGray
+                Write-Host 'Syntax: load +<days>' -ForegroundColor DarkGray
+                Write-Host 'Syntax: load -<days>' -ForegroundColor DarkGray
+                Write-Host 'Syntax: load' -ForegroundColor DarkGray
+                Write-Host 'load 2024-01-25' -NoNewline
+                Write-Host ' # Load task list for date 2024-01-25.' -ForegroundColor DarkGreen
+                Write-Host 'load 17' -NoNewline
+                Write-Host ' # Load task list for day 17 (of current month).' -ForegroundColor DarkGreen
+                Write-Host 'load +1' -NoNewline
+                Write-Host " # Load next day's task list (relative to currently loaded task list)." -ForegroundColor DarkGreen
+                Write-Host 'load -3' -NoNewline
+                Write-Host ' # Load task list from 3 days ago (relative to currently loaded task list).' -ForegroundColor DarkGreen
+                Write-Host 'load' -NoNewline
+                Write-Host " # Load today's task list." -ForegroundColor DarkGreen
+
+                Write-Host "`n# View upcoming tasks" -ForegroundColor DarkYellow
+                Write-Host 'calendar'
+                Write-Host 'cal'
+
+                Write-Host "`n# Open the directory that contains the configuration file" -ForegroundColor DarkYellow
+                Write-Host 'directory'
+                Write-Host 'dir'
+
+                Write-Host "`n# Exit WhatToDo" -ForegroundColor DarkYellow
+                Write-Host 'exit'
+
+                Read-Host "`nPress <Enter> to exit help view"
             }
             elseif ($UserCommand -eq 'exit') {
                 $ExitScript = $true
             }
             else {
                 $MessageList.Add("Invalid command: '$($UserCommand)'")
+                $MessageList.Add("Type help to show available commands.")
             }
         }
 
@@ -476,6 +572,26 @@ function Initialize-WhatToDo {
         $configFileContent = @"
 @{
     TaskListFile = '$($taskListFilePath)'
+
+    RecurringTasks = @(
+        <#@{
+            DueDate = @{
+                Month = 1, 4, 10
+                Day = 8, 19, 25
+                Weekday = 'Monday', 'Friday'
+                FirstWeekdayOfMonth = 'Tuesday'
+                SecondWeekdayOfMonth = 'Wednesday', 'Friday'
+                ThirdWeekdayOfMonth = 'Thursday'
+                FourthWeekdayOfMonth = 'Monday'
+            }
+
+            Task = @{
+                Priority = 'A'
+                EstimateMinutes = 30
+                Description = 'Test task'
+            }
+        }#>
+    )
 }
 "@
         try {
@@ -506,58 +622,96 @@ Export-ModuleMember -Function Initialize-WhatToDo
 function Get-WhatToDoRecurringTasks {
     param(
         [Parameter(Mandatory)]
+        [System.Collections.ArrayList]$TaskList,
+        [Parameter(Mandatory)]
         $RecurringTasksConfig
     )
-
-    #TODO: Implement recurring tasks.
 
     $tempTaskList = New-Object -TypeName 'System.Collections.ArrayList'
 
     foreach ($task in $RecurringTasksConfig) {
-        if ($task.Time.Month) {
-            Write-Host "Month: $($task.Time.Month)"
+        $configuredDueDateSettings = 0
+        $matchingDueDateSettings = 0
+
+        if (($task.DueDate.Month | Measure-Object).Count -gt 0) {
+            $configuredDueDateSettings++
+            if ((Get-Date).Month -in $task.DueDate.Month) {
+                $matchingDueDateSettings++
+            }
         }
 
-        if ($task.Time.DayOfMonth) {
-            Write-Host "Day of month: $($task.Time.DayOfMonth)"
+        if (($task.DueDate.Day | Measure-Object).Count -gt 0) {
+            $configuredDueDateSettings++
+            if ((Get-Date).Day -in $task.DueDate.Day) {
+                $matchingDueDateSettings++
+            }
         }
 
-        if ($task.Time.Weekday) {
-            Write-Host "Weekday: $($task.Time.Weekday)"
+        if (($task.DueDate.Weekday | Measure-Object).Count -gt 0) {
+            $configuredDueDateSettings++
+            if ((Get-Date).DayOfWeek -in $task.DueDate.Weekday) {
+                $matchingDueDateSettings++
+            }
         }
 
-        if ($task.Time.FirstWeekdayOfMonth) {
-            Write-Host "First weekday of month: $($task.Time.FirstWeekdayOfMonth)"
+        if ($task.DueDate.FirstWeekdayOfMonth) {
+            $configuredDueDateSettings++
+            if (((Get-Date).Day -le 7) -and
+                ((Get-Date).DayOfWeek -in $task.DueDate.FirstWeekdayOfMonth)) {
+                $matchingDueDateSettings++
+            }
         }
 
-        if ($task.Time.SecondWeekdayOfMonth) {
-            Write-Host "Second weekday of month: $($task.Time.SecondWeekdayOfMonth)"
+        if ($task.DueDate.SecondWeekdayOfMonth) {
+            $configuredDueDateSettings++
+            if (((Get-Date).Day -gt 7) -and
+                ((Get-Date).Day -le 14) -and
+                ((Get-Date).DayOfWeek -in $task.DueDate.SecondWeekdayOfMonth)) {
+                $matchingDueDateSettings++
+            }
         }
 
-        if ($task.Time.ThirdWeekdayOfMonth) {
-            Write-Host "Third weekday of month: $($task.Time.ThirdWeekdayOfMonth)"
+        if ($task.DueDate.ThirdWeekdayOfMonth) {
+            $configuredDueDateSettings++
+            if (((Get-Date).Day -gt 14) -and
+                ((Get-Date).Day -le 21) -and
+                ((Get-Date).DayOfWeek -in $task.DueDate.ThirdWeekdayOfMonth)) {
+                $matchingDueDateSettings++
+            }
         }
 
-        if ($task.Time.FourthWeekdayOfMonth) {
-            Write-Host "Fourth weekday of month: $($task.Time.FourthWeekdayOfMonth)"
+        if ($task.DueDate.FourthWeekdayOfMonth) {
+            $configuredDueDateSettings++
+            if (((Get-Date).Day -gt 21) -and
+                ((Get-Date).DayOfWeek -in $task.DueDate.LastWeekdayOfMonth)) {
+                $matchingDueDateSettings++
+            }
         }
 
-        try {
-            [void]$tempTaskList.Add([PSCustomObject]@{
-                Completed = $false
-                Priority = $task.Task.Priority.ToUpper()
-                CompletionDate = $null
-                Description = $task.Task.Description
-                EstimateMinutes = $task.Task.EstimateMinutes
-                CreationDate = Get-Date
-                DueDate = Get-Date
-            })
-        }
-        catch {
-            #TODO
+        # Write-Host "Configured due-date settings: $($configuredDueDateSettings)"
+        # Write-Host "Matching due-date settings: $($matchingDueDateSettings)"
+
+        if (($configuredDueDateSettings -gt 0) -and ($matchingDueDateSettings -eq $configuredDueDateSettings)) {
+            if (($TaskList | Where-Object { ($_.Description -ceq $task.Task.Description) -and ((Get-Date $_.DueDate).Date -eq (Get-Date).Date) } | Measure-Object).Count -eq 0) {
+                try {
+                    [void]$tempTaskList.Add([PSCustomObject]@{
+                        Completed = $false
+                        Priority = $task.Task.Priority.ToUpper()
+                        CompletionDate = $null
+                        Description = $task.Task.Description
+                        EstimateMinutes = $task.Task.EstimateMinutes
+                        CreationDate = Get-Date
+                        DueDate = Get-Date
+                    })
+                }
+                catch {
+                    Write-Error "Failed to add recurring task. $($Error[0])"
+                    Read-Host 'Press <Enter> to continue'
+                }
+            }
         }
     }
 
-    Read-Host 'DEBUG'
+    # Read-Host 'DEBUG'
     return $tempTaskList
 }
