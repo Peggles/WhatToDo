@@ -576,13 +576,14 @@ function Initialize-WhatToDo {
     RecurringTasks = @(
         <#@{
             DueDate = @{
-                Month = 1, 4, 10
-                Day = 8, 19, 25
+                # Month = 1, 4, 10
+                Week = 1, 3, 5, 7, 50
+                # Day = 8, 19, 25
                 Weekday = 'Monday', 'Friday'
-                FirstWeekdayOfMonth = 'Tuesday'
-                SecondWeekdayOfMonth = 'Wednesday', 'Friday'
-                ThirdWeekdayOfMonth = 'Thursday'
-                FourthWeekdayOfMonth = 'Monday'
+                # FirstWeekdayOfMonth = 'Tuesday'
+                # SecondWeekdayOfMonth = 'Wednesday', 'Friday'
+                # ThirdWeekdayOfMonth = 'Thursday'
+                # FourthWeekdayOfMonth = 'Monday'
             }
 
             Task = @{
@@ -636,6 +637,13 @@ function Get-WhatToDoRecurringTasks {
         if (($task.DueDate.Month | Measure-Object).Count -gt 0) {
             $configuredDueDateSettings++
             if ((Get-Date).Month -in $task.DueDate.Month) {
+                $matchingDueDateSettings++
+            }
+        }
+
+        if (($task.DueDate.Week | Measure-Object).Count -gt 0) {
+            $configuredDueDateSettings++
+            if ((Get-Date -UFormat '%V') -in $task.DueDate.Week) {
                 $matchingDueDateSettings++
             }
         }
