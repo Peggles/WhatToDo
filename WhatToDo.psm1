@@ -15,15 +15,23 @@ function Start-WhatToDo {
     $TaskList = New-Object -TypeName 'System.Collections.ArrayList'
     $TaskList = [System.Collections.ArrayList](Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate)
 
-    $recurringTasks = Get-WhatToDoRecurringTasks -TaskList $TaskList -RecurringTasksConfig $ScriptConfig.RecurringTasks
-    if (($recurringTasks | Measure-Object).Count -gt 0) {
-            $recurringTasks | ForEach-Object {
-            $tempTask = $_
-            if ((($TaskList | Where-Object { ($_.Description -eq $tempTask.Description) -and ($_.DueDate -eq $tempTask.DueDate) }) | Measure-Object).Count -eq 0) {
-                $TaskList.Add($tempTask)
+    $recurringTasksAddedCount = 0
+    $recurringTasksDays = 7
+    for ($i = 0; $i -le $recurringTasksDays; $i++) {
+        $recurringTasks = Get-WhatToDoRecurringTasks -TaskList $TaskList -RecurringTasksConfig $ScriptConfig.RecurringTasks -Date (Get-Date).AddDays($i)
+        if (($recurringTasks | Measure-Object).Count -gt 0) {
+                $recurringTasks | ForEach-Object {
+                $tempTask = $_
+                if ((($TaskList | Where-Object { ($_.Description -eq $tempTask.Description) -and ($_.DueDate -eq $tempTask.DueDate) }) | Measure-Object).Count -eq 0) {
+                    [void]$TaskList.Add($tempTask)
+                    $recurringTasksAddedCount++
+                }
             }
+            Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
         }
-        Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
+    }
+    if ($recurringTasksAddedCount -gt 0) {
+        $MessageList.Add("Added $($recurringTasksAddedCount) recurring task(s) from today to $(Get-Date ((Get-Date).AddDays($recurringTasksDays)) -Format 'd\/M').")
     }
 
     while (!$ExitScript) {
@@ -68,11 +76,13 @@ function Start-WhatToDo {
             Write-Host
         }
 
-        $index = 0
-        # Convert task list to array list and sort it (if it contains more than 1, otherwise skip conversion).
+        
+        # Convert task list to array list and sort it (if it contains more than one task, otherwise skip conversion).
         if (($TaskList | Measure-Object).Count -gt 1) {
             $TaskList = [System.Collections.ArrayList]($TaskList | Sort-Object -Property Completed, Priority, EstimateMinutes, CreationDate, Description)
         }
+
+        $index = 0
         $TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date } | ForEach-Object {
             $index++
             Write-Host '[' -NoNewline -ForegroundColor DarkGray
@@ -197,8 +207,8 @@ function Start-WhatToDo {
                 Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
             }
             elseif ($UserCommand -match '^edit (\d+)$') {
-                $tempIndex = $Matches.1
-                $currentTasks = ($TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date })
+                $tempIndex = [int]$Matches.1
+                $currentTasks = ($TaskList | Where-Object { (Get-Date $_.DueDate).Date -eq (Get-Date $ListDate).Date })
 
                 if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                     $task = [PSCustomObject]$currentTasks[$tempIndex-1]
@@ -222,8 +232,8 @@ function Start-WhatToDo {
                 }
             }
             elseif ($UserCommand -match '^remove (\d+)$') {
-                $tempIndex = $Matches.1
-                $currentTasks = ($TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date })
+                $tempIndex = [int]$Matches.1
+                $currentTasks = ($TaskList | Where-Object { (Get-Date $_.DueDate).Date -eq (Get-Date $ListDate).Date })
 
                 if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                     $task = [PSCustomObject]$currentTasks[$tempIndex-1]
@@ -240,8 +250,8 @@ function Start-WhatToDo {
                 }
             }
             elseif ($UserCommand -match '^done (\d+)$') {
-                $tempIndex = $Matches.1
-                $currentTasks = ($TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date })
+                $tempIndex = [int]$Matches.1
+                $currentTasks = ($TaskList | Where-Object { (Get-Date $_.DueDate).Date -eq (Get-Date $ListDate).Date })
 
                 if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                     $task = [PSCustomObject]$currentTasks[$tempIndex-1]
@@ -259,8 +269,8 @@ function Start-WhatToDo {
                 }
             }
             elseif ($UserCommand -match '^undone (\d+)$') {
-                $tempIndex = $Matches.1
-                $currentTasks = ($TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date })
+                $tempIndex = [int]$Matches.1
+                $currentTasks = ($TaskList | Where-Object { (Get-Date $_.DueDate).Date -eq (Get-Date $ListDate).Date })
 
                 if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                     $task = [PSCustomObject]$currentTasks[$tempIndex-1]
@@ -278,9 +288,9 @@ function Start-WhatToDo {
                 }
             }
             elseif ($UserCommand -match '^move (\d+) (\d{4}-\d{2}-\d{2})$') {
-                $tempIndex = $Matches.1
+                $tempIndex = [int]$Matches.1
                 $newDueDate = Get-Date $Matches.2
-                $currentTasks = ($TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date })
+                $currentTasks = ($TaskList | Where-Object { (Get-Date $_.DueDate).Date -eq (Get-Date $ListDate).Date })
                 if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                     $task = [PSCustomObject]$currentTasks[$tempIndex-1]
                     ($TaskList | Where-Object { $_ -eq $task }).DueDate = $newDueDate
@@ -291,9 +301,9 @@ function Start-WhatToDo {
                 }
             }
             elseif ($UserCommand -match '^move (\d+) (\d{1,2})$') {
-                $tempIndex = $Matches.1
+                $tempIndex = [int]$Matches.1
                 $newDueDate = Get-Date -Day $Matches.2
-                $currentTasks = ($TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date })
+                $currentTasks = ($TaskList | Where-Object { (Get-Date $_.DueDate).Date -eq (Get-Date $ListDate).Date })
                 if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                     $task = [PSCustomObject]$currentTasks[$tempIndex-1]
                     ($TaskList | Where-Object { $_ -eq $task }).DueDate = $newDueDate
@@ -304,7 +314,7 @@ function Start-WhatToDo {
                 }
             }
             elseif ($UserCommand -match '^move (\d+)$') {
-                $tempIndex = $Matches.1
+                $tempIndex = [int]$Matches.1
                 $moveDays = 0
 
                 # Move task to next workday.
@@ -317,7 +327,7 @@ function Start-WhatToDo {
                     ((Get-Date $ListDate).AddDays($moveDays).DayOfWeek -gt 5)
                 )
 
-                $currentTasks = ($TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date })
+                $currentTasks = ($TaskList | Where-Object { (Get-Date $_.DueDate).Date -eq (Get-Date $ListDate).Date })
                 if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                     $task = [PSCustomObject]$currentTasks[$tempIndex-1]
                     ($TaskList | Where-Object { $_ -eq $task }).DueDate = $newDueDate
@@ -368,7 +378,7 @@ function Start-WhatToDo {
                     }
                 }
                 else {
-                    Write-Host "No upcoming tasks next $($futureTasks) days." -ForegroundColor DarkGray
+                    Write-Host "No upcoming tasks next $($futureDays) days." -ForegroundColor DarkGray
                 }
                 Write-Host
                 Read-Host 'Press <Enter> to exit calendar view'
@@ -422,7 +432,7 @@ function Start-WhatToDo {
                 Write-Host 'move 3' -NoNewline
                 Write-Host ' # Move task number 3 to next workday.' -ForegroundColor DarkGreen
 
-                Write-Host "`n# Load another day's task list" -ForegroundColor DarkYellow
+                Write-Host "`n# Load a task list" -ForegroundColor DarkYellow
                 Write-Host 'Syntax: load <yyyy-MM-dd>' -ForegroundColor DarkGray
                 Write-Host 'Syntax: load <dd>' -ForegroundColor DarkGray
                 Write-Host 'Syntax: load +<days>' -ForegroundColor DarkGray
@@ -625,7 +635,10 @@ function Get-WhatToDoRecurringTasks {
         [Parameter(Mandatory)]
         [System.Collections.ArrayList]$TaskList,
         [Parameter(Mandatory)]
-        $RecurringTasksConfig
+        $RecurringTasksConfig,
+        [Parameter(Mandatory)]
+        [ValidateNotNull()]
+        [DateTime]$Date
     )
 
     $tempTaskList = New-Object -TypeName 'System.Collections.ArrayList'
@@ -636,62 +649,62 @@ function Get-WhatToDoRecurringTasks {
 
         if (($task.DueDate.Month | Measure-Object).Count -gt 0) {
             $configuredDueDateSettings++
-            if ((Get-Date).Month -in $task.DueDate.Month) {
+            if ($Date.Month -in $task.DueDate.Month) {
                 $matchingDueDateSettings++
             }
         }
 
         if (($task.DueDate.Week | Measure-Object).Count -gt 0) {
             $configuredDueDateSettings++
-            if ((Get-Date -UFormat '%V') -in $task.DueDate.Week) {
+            if ((Get-Date $Date -UFormat '%V') -in $task.DueDate.Week) {
                 $matchingDueDateSettings++
             }
         }
 
         if (($task.DueDate.Day | Measure-Object).Count -gt 0) {
             $configuredDueDateSettings++
-            if ((Get-Date).Day -in $task.DueDate.Day) {
+            if ($Date.Day -in $task.DueDate.Day) {
                 $matchingDueDateSettings++
             }
         }
 
         if (($task.DueDate.Weekday | Measure-Object).Count -gt 0) {
             $configuredDueDateSettings++
-            if ((Get-Date).DayOfWeek -in $task.DueDate.Weekday) {
+            if ($Date.DayOfWeek -in $task.DueDate.Weekday) {
                 $matchingDueDateSettings++
             }
         }
 
-        if ($task.DueDate.FirstWeekdayOfMonth) {
+        if (($task.DueDate.FirstWeekdayOfMonth | Measure-Object).Count -gt 0) {
             $configuredDueDateSettings++
-            if (((Get-Date).Day -le 7) -and
-                ((Get-Date).DayOfWeek -in $task.DueDate.FirstWeekdayOfMonth)) {
+            if (($Date.Day -le 7) -and
+                ($Date.DayOfWeek -in $task.DueDate.FirstWeekdayOfMonth)) {
                 $matchingDueDateSettings++
             }
         }
 
-        if ($task.DueDate.SecondWeekdayOfMonth) {
+        if (($task.DueDate.SecondWeekdayOfMonth | Measure-Object).Count -gt 0) {
             $configuredDueDateSettings++
-            if (((Get-Date).Day -gt 7) -and
-                ((Get-Date).Day -le 14) -and
-                ((Get-Date).DayOfWeek -in $task.DueDate.SecondWeekdayOfMonth)) {
+            if (($Date.Day -gt 7) -and
+                ($Date.Day -le 14) -and
+                ($Date.DayOfWeek -in $task.DueDate.SecondWeekdayOfMonth)) {
                 $matchingDueDateSettings++
             }
         }
 
-        if ($task.DueDate.ThirdWeekdayOfMonth) {
+        if (($task.DueDate.ThirdWeekdayOfMonth | Measure-Object).Count -gt 0) {
             $configuredDueDateSettings++
-            if (((Get-Date).Day -gt 14) -and
-                ((Get-Date).Day -le 21) -and
-                ((Get-Date).DayOfWeek -in $task.DueDate.ThirdWeekdayOfMonth)) {
+            if (($Date.Day -gt 14) -and
+                ($Date.Day -le 21) -and
+                ($Date.DayOfWeek -in $task.DueDate.ThirdWeekdayOfMonth)) {
                 $matchingDueDateSettings++
             }
         }
 
-        if ($task.DueDate.FourthWeekdayOfMonth) {
+        if (($task.DueDate.FourthWeekdayOfMonth | Measure-Object).Count -gt 0) {
             $configuredDueDateSettings++
-            if (((Get-Date).Day -gt 21) -and
-                ((Get-Date).DayOfWeek -in $task.DueDate.FourthWeekdayOfMonth)) {
+            if (($Date.Day -gt 21) -and
+                ($Date.DayOfWeek -in $task.DueDate.FourthWeekdayOfMonth)) {
                 $matchingDueDateSettings++
             }
         }
@@ -700,7 +713,7 @@ function Get-WhatToDoRecurringTasks {
         # Write-Host "Matching due-date settings: $($matchingDueDateSettings)"
 
         if (($configuredDueDateSettings -gt 0) -and ($matchingDueDateSettings -eq $configuredDueDateSettings)) {
-            if (($TaskList | Where-Object { ($_.Description -ceq $task.Task.Description) -and ((Get-Date $_.DueDate).Date -eq (Get-Date).Date) } | Measure-Object).Count -eq 0) {
+            if (($TaskList | Where-Object { ($_.Description -ceq $task.Task.Description) -and ((Get-Date $_.DueDate).Date -eq $Date.Date) } | Measure-Object).Count -eq 0) {
                 try {
                     [void]$tempTaskList.Add([PSCustomObject]@{
                         Completed = $false
@@ -708,8 +721,8 @@ function Get-WhatToDoRecurringTasks {
                         CompletionDate = $null
                         Description = $task.Task.Description
                         EstimateMinutes = $task.Task.EstimateMinutes
-                        CreationDate = Get-Date
-                        DueDate = Get-Date
+                        CreationDate = $Date
+                        DueDate = $Date
                     })
                 }
                 catch {
