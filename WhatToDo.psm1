@@ -31,7 +31,7 @@ function Start-WhatToDo {
         }
     }
     if ($recurringTasksAddedCount -gt 0) {
-        $MessageList.Add("Added $($recurringTasksAddedCount) recurring task(s) from today to $(Get-Date ((Get-Date).AddDays($recurringTasksDays)) -Format 'd\/M').")
+        $MessageList.Add("Added $($recurringTasksAddedCount) recurring task(s) from today to $(((Get-Date).AddDays($recurringTasksDays)).DayOfWeek.ToString().ToLower()) $(Get-Date (Get-Date).AddDays($recurringTasksDays) -Format 'd\/M').")
     }
 
     while (!$ExitScript) {
