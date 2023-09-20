@@ -15,6 +15,10 @@ function Start-WhatToDo {
     $TaskList = New-Object -TypeName 'System.Collections.ArrayList'
     $TaskList = [System.Collections.ArrayList](Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate)
 
+    if ($ScriptConfig.AutoBackupTaskListFileOnStartup) {
+        Backup-WhatToDoTasks -SourceFilePath $ScriptConfig.TaskListFile
+    }
+
     $recurringTasksAddedCount = 0
     $recurringTasksDays = 7
     for ($i = 0; $i -le $recurringTasksDays; $i++) {
@@ -613,6 +617,7 @@ function Initialize-WhatToDo {
         $configFileContent = @"
 @{
     TaskListFile = '$($taskListFilePath)'
+    AutoBackupTaskListFileOnStartup = $false
 
     RecurringTasks = @(
         <#@{
@@ -766,4 +771,36 @@ function Get-WhatToDoRecurringTasks {
 
     # Read-Host 'DEBUG'
     return $tempTaskList
+}
+
+function Backup-WhatToDoTasks {
+    param(
+        [Parameter(Mandatory)]
+        [ValidateScript({
+            if (Test-Path -Path $_ -PathType Leaf) { return $true }
+            else { throw [System.IO.FileNotFoundException] "Cannot find the file '$($_))'." }
+        })]
+        [string]$SourceFilePath
+    )
+
+    $backupDirectoryPath = Join-Path -Path (Split-Path -Path $SourceFilePath -Parent) -ChildPath 'backup'
+    if (!(Test-Path -Path $backupDirectoryPath)) {
+        try {
+            New-Item -Path $backupDirectoryPath -ItemType Directory
+        }
+        catch {
+            throw "Failed to create backup directory '$($backupDirectoryPath)'. $($Error[0])"
+        }
+    }
+
+    try {
+        $backupDirectory = Get-Item -Path $backupDirectoryPath
+        $sourceFile = Get-Item -Path $SourceFilePath
+        $destinationFilename = '{0}_{1}{2}' -f $SourceFile.BaseName, (Get-Date -Format 'yyyyMMdd-HHmmss'), $SourceFile.Extension
+        $destinationPath = Join-Path -Path $backupDirectory.FullName -ChildPath $destinationFilename
+        Copy-Item -Path $SourceFilePath -Destination $destinationPath
+    }
+    catch {
+        throw "Failed to backup tasks file '$($SourceFilePath)'. $($Error[0])"
+    }
 }
