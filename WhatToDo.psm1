@@ -198,7 +198,6 @@ function Start-WhatToDo {
                         CreationDate = Get-Date
                         DueDate = Get-Date $ListDate
                     })
-                    # $TaskList = [System.Collections.ArrayList]($TaskList | Sort-Object -Property Completed, Priority, EstimateMinutes, CreationDate, Description)
                     Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
                     $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
                 }
@@ -210,7 +209,6 @@ function Start-WhatToDo {
                         CreationDate = Get-Date
                         DueDate = Get-Date $ListDate
                     })
-                    # $TaskList = [System.Collections.ArrayList]($TaskList | Sort-Object -Property Completed, Priority, EstimateMinutes, CreationDate, Description)
                     Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
                     $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
                 }
@@ -228,12 +226,17 @@ function Start-WhatToDo {
                             ($TaskList | Where-Object { $_ -eq $task }).Priority = $newPriority.Trim().ToUpper()
                         }
                         if (![string]::IsNullOrWhiteSpace($newEstimate)) {
-                            ($TaskList | Where-Object { $_ -eq $task }).EstimateMinutes = $newEstimate.Trim()
+                            if ($newEstimate -match '^(\d+)$') {
+                                $estimateMinutes = [int]$Matches.1
+                            }
+                            elseif ($newEstimate -match '^(\d+[\.,]?5?)h$') {
+                                $estimateMinutes = [float]($Matches.1).Replace(',', '.') * 60
+                            }
+                            ($TaskList | Where-Object { $_ -eq $task }).EstimateMinutes = $estimateMinutes
                         }
                         if (![string]::IsNullOrWhiteSpace($newDescription)) {
                             ($TaskList | Where-Object { $_ -eq $task }).Description = $newDescription.Trim()
                         }
-                        # $TaskList = [System.Collections.ArrayList]($TaskList | Sort-Object -Property Completed, Priority, EstimateMinutes, CreationDate, Description)
                         Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
                         $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
                     }
@@ -249,7 +252,6 @@ function Start-WhatToDo {
                         $task = [PSCustomObject]$currentTasks[$tempIndex-1]
                         if (!$task.Completed) {
                             $TaskList.Remove(($TaskList | Where-Object { $_ -eq $task }))
-                            # $TaskList = [System.Collections.ArrayList]($TaskList | Sort-Object -Property Completed, Priority, EstimateMinutes, CreationDate, Description)
                             Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
                             $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
                         }
@@ -270,7 +272,6 @@ function Start-WhatToDo {
                         if (!$task.Completed) {
                             ($TaskList | Where-Object { $_ -eq $task }).Completed = $true
                             ($TaskList | Where-Object { $_ -eq $task }).CompletionDate = Get-Date
-                            # $TaskList = [System.Collections.ArrayList]($TaskList | Sort-Object -Property Completed, Priority, EstimateMinutes, CreationDate, Description)
                             Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
                             $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
                         }
@@ -291,7 +292,6 @@ function Start-WhatToDo {
                         if ($task.Completed) {
                             ($TaskList | Where-Object { $_ -eq $task }).Completed = $false
                             ($TaskList | Where-Object { $_ -eq $task }).CompletionDate = $null
-                            # $TaskList = [System.Collections.ArrayList]($TaskList | Sort-Object -Property Completed, Priority, EstimateMinutes, CreationDate, Description)
                             Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
                             $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
                         }
@@ -310,7 +310,6 @@ function Start-WhatToDo {
                     if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                         $task = [PSCustomObject]$currentTasks[$tempIndex-1]
                         ($TaskList | Where-Object { $_ -eq $task }).DueDate = $newDueDate
-                        # $TaskList = [System.Collections.ArrayList]($TaskList | Sort-Object -Property Completed, Priority, EstimateMinutes, CreationDate, Description)
                         Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
                         $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
                     }
@@ -325,7 +324,6 @@ function Start-WhatToDo {
                     if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                         $task = [PSCustomObject]$currentTasks[$tempIndex-1]
                         ($TaskList | Where-Object { $_ -eq $task }).DueDate = $newDueDate
-                        # $TaskList = [System.Collections.ArrayList]($TaskList | Sort-Object -Property Completed, Priority, EstimateMinutes, CreationDate, Description)
                         Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
                         $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
                     }
@@ -351,7 +349,6 @@ function Start-WhatToDo {
                     if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                         $task = [PSCustomObject]$currentTasks[$tempIndex-1]
                         ($TaskList | Where-Object { $_ -eq $task }).DueDate = $newDueDate
-                        # $TaskList = [System.Collections.ArrayList]($TaskList | Sort-Object -Property Completed, Priority, EstimateMinutes, CreationDate, Description)
                         Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
                         $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
                     }
@@ -361,20 +358,16 @@ function Start-WhatToDo {
                 }
                 elseif ($UserCommand -match '^load (\d{4}-\d{2}-\d{2})$') {
                     $ListDate = Get-Date $Matches.1
-                    # $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
                 }
                 elseif ($UserCommand -match '^load (\d{1,2})$') {
                     $ListDate = Get-Date -Day $Matches.1
-                    # $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
                 }
                 elseif ($UserCommand -match '^load (\+|\-{1})(\d+)$') {
                     $shiftDays = [int]($Matches.1 + [int]$Matches.2)
                     $ListDate = (Get-Date $ListDate).AddDays($shiftDays)
-                    # $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
                 }
                 elseif ($UserCommand -eq 'load') {
                     $ListDate = Get-Date
-                    # $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
                 }
                 elseif (($UserCommand -eq 'calendar') -or ($UserCommand -eq 'cal')) {
                     $futureDays = 7
