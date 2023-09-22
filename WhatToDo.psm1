@@ -15,7 +15,7 @@ function Start-WhatToDo {
     $TaskList = New-Object -TypeName 'System.Collections.ArrayList'
     $TaskList = [System.Collections.ArrayList](Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate)
 
-    if ($ScriptConfig.AutoBackupTaskListFileOnStartup) {
+    if ($ScriptConfig.BackupTaskListFileOncePerDayOnStartup) {
         Backup-WhatToDoTasks -SourceFilePath $ScriptConfig.TaskListFile
     }
 
@@ -376,7 +376,7 @@ function Start-WhatToDo {
                     $ListDate = Get-Date
                     # $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
                 }
-                elseif ($UserCommand -eq 'next') {
+                elseif (($UserCommand -eq 'calendar') -or ($UserCommand -eq 'cal')) {
                     $futureDays = 7
                     $futureTasks = $TaskList | Where-Object {
                         ($_.DueDate.Date -gt (Get-Date)) -and
@@ -402,19 +402,25 @@ function Start-WhatToDo {
                     else {
                         Write-Host "No upcoming tasks next $($futureDays) days." -ForegroundColor DarkGray
                     }
-                    Write-Host
-                    Read-Host 'Press <Enter> to exit upcoming tasks view'
-                }
-                elseif (($UserCommand -eq 'calendar') -or ($UserCommand -eq 'cal')) {
+
+                    if ($ScriptConfig.UsePSCalendarModule) {
+                        Write-Host
+                        $highlightDates = @()
+                        $TaskList | Where-Object {
+                            !$_.Completed -and
+                            ((Get-Date $_.DueDate).Month -eq (Get-Date).Month)
+                        } | ForEach-Object {
+                            $highlightDates += (Get-Date $_.DueDate -Format 'yyyy-MM-dd')
+                        }
+                        Get-Calendar -HighlightDate $highlightDates
+                    }
+
                     Write-Host
                     Read-Host 'Press <Enter> to exit calendar view'
                 }
                 elseif (($UserCommand -eq 'directory') -or ($UserCommand -eq 'dir')) {
                     Invoke-Item (Split-Path -Path $ScriptConfig.TaskListFile -Parent)
                 }
-                # elseif ($UserCommand -eq 'save') {
-                #     Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
-                # }
                 elseif ($UserCommand -eq 'help') {
                     Write-Host "### Help ###" -ForegroundColor DarkCyan
 
@@ -475,10 +481,7 @@ function Start-WhatToDo {
                     Write-Host 'load' -NoNewline
                     Write-Host " # Load today's task list." -ForegroundColor DarkGreen
 
-                    Write-Host "`n# View upcoming tasks" -ForegroundColor DarkYellow
-                    Write-Host 'next'
-
-                    Write-Host "`n# View calendar" -ForegroundColor DarkYellow
+                    Write-Host "`n# View calendar and upcoming tasks" -ForegroundColor DarkYellow
                     Write-Host 'calendar'
                     Write-Host 'cal'
 
@@ -617,7 +620,8 @@ function Initialize-WhatToDo {
         $configFileContent = @"
 @{
     TaskListFile = '$($taskListFilePath)'
-    AutoBackupTaskListFileOnStartup = $false
+    BackupTaskListFileOncePerDayOnStartup = $false
+    UsePSCalendarModule = $false
 
     RecurringTasks = @(
         <#@{
@@ -745,9 +749,6 @@ function Get-WhatToDoRecurringTasks {
             }
         }
 
-        # Write-Host "Configured due-date settings: $($configuredDueDateSettings)"
-        # Write-Host "Matching due-date settings: $($matchingDueDateSettings)"
-
         if (($configuredDueDateSettings -gt 0) -and ($matchingDueDateSettings -eq $configuredDueDateSettings)) {
             if (($TaskList | Where-Object { ($_.Description -ceq $task.Task.Description) -and ((Get-Date $_.DueDate).Date -eq $Date.Date) } | Measure-Object).Count -eq 0) {
                 try {
@@ -769,7 +770,6 @@ function Get-WhatToDoRecurringTasks {
         }
     }
 
-    # Read-Host 'DEBUG'
     return $tempTaskList
 }
 
@@ -796,11 +796,14 @@ function Backup-WhatToDoTasks {
     try {
         $backupDirectory = Get-Item -Path $backupDirectoryPath
         $sourceFile = Get-Item -Path $SourceFilePath
-        $destinationFilename = '{0}_{1}{2}' -f $SourceFile.BaseName, (Get-Date -Format 'yyyyMMdd-HHmmss'), $SourceFile.Extension
+        $destinationFilename = '{0}_{1}{2}' -f $SourceFile.BaseName, (Get-Date -Format 'yyyy-MM-dd'), $SourceFile.Extension
         $destinationPath = Join-Path -Path $backupDirectory.FullName -ChildPath $destinationFilename
-        Copy-Item -Path $SourceFilePath -Destination $destinationPath
+        if (!(Test-Path -Path $destinationPath)) {
+            Copy-Item -Path $SourceFilePath -Destination $destinationPath
+        }
     }
     catch {
-        throw "Failed to backup tasks file '$($SourceFilePath)'. $($Error[0])"
+        Write-Error "Failed to backup tasks file '$($SourceFilePath)'. $($Error[0])"
+        Read-Host 'Press <Enter> to continue'
     }
 }
