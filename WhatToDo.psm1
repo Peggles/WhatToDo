@@ -218,9 +218,25 @@ function Start-WhatToDo {
 
                     if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                         $task = [PSCustomObject]$currentTasks[$tempIndex-1]
+                        
+                        $currentClipboardValue = Get-Clipboard
+                        try {
+                            Set-Clipboard -Value $task.Description
+                        }
+                        catch {
+                            Write-Error 'Failed to set task description clipboard value.'
+                        }
+
                         $newPriority = Read-Host 'New priority'
                         $newEstimate = Read-Host 'New estimate'
                         $newDescription = Read-Host 'New description'
+
+                        try {
+                            Set-Clipboard -Value $currentClipboardValue
+                        }
+                        catch {
+                            Write-Error 'Failed to revert clipboard to previous value.'
+                        }
 
                         if (![string]::IsNullOrWhiteSpace($newPriority)) {
                             ($TaskList | Where-Object { $_ -eq $task }).Priority = $newPriority.Trim().ToUpper()
