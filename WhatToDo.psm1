@@ -218,43 +218,47 @@ function Start-WhatToDo {
 
                     if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                         $task = [PSCustomObject]$currentTasks[$tempIndex-1]
-                        
-                        $currentClipboardValue = Get-Clipboard
-                        try {
-                            Set-Clipboard -Value $task.Description
-                        }
-                        catch {
-                            Write-Error 'Failed to set task description clipboard value.'
-                        }
-
-                        $newPriority = Read-Host 'New priority'
-                        $newEstimate = Read-Host 'New estimate'
-                        $newDescription = Read-Host 'New description'
-
-                        try {
-                            Set-Clipboard -Value $currentClipboardValue
-                        }
-                        catch {
-                            Write-Error 'Failed to revert clipboard to previous value.'
-                        }
-
-                        if (![string]::IsNullOrWhiteSpace($newPriority)) {
-                            ($TaskList | Where-Object { $_ -eq $task }).Priority = $newPriority.Trim().ToUpper()
-                        }
-                        if (![string]::IsNullOrWhiteSpace($newEstimate)) {
-                            if ($newEstimate -match '^(\d+)$') {
-                                $estimateMinutes = [int]$Matches.1
+                        if (!$task.Completed) {
+                            $currentClipboardValue = Get-Clipboard
+                            try {
+                                Set-Clipboard -Value $task.Description
                             }
-                            elseif ($newEstimate -match '^(\d+[\.,]?5?)h$') {
-                                $estimateMinutes = [float]($Matches.1).Replace(',', '.') * 60
+                            catch {
+                                Write-Error 'Failed to set task description clipboard value.'
                             }
-                            ($TaskList | Where-Object { $_ -eq $task }).EstimateMinutes = $estimateMinutes
+
+                            $newPriority = Read-Host 'New priority'
+                            $newEstimate = Read-Host 'New estimate'
+                            $newDescription = Read-Host 'New description'
+
+                            try {
+                                Set-Clipboard -Value $currentClipboardValue
+                            }
+                            catch {
+                                Write-Error 'Failed to revert clipboard to previous value.'
+                            }
+
+                            if (![string]::IsNullOrWhiteSpace($newPriority)) {
+                                ($TaskList | Where-Object { $_ -eq $task }).Priority = $newPriority.Trim().ToUpper()
+                            }
+                            if (![string]::IsNullOrWhiteSpace($newEstimate)) {
+                                if ($newEstimate -match '^(\d+)$') {
+                                    $estimateMinutes = [int]$Matches.1
+                                }
+                                elseif ($newEstimate -match '^(\d+[\.,]?5?)h$') {
+                                    $estimateMinutes = [float]($Matches.1).Replace(',', '.') * 60
+                                }
+                                ($TaskList | Where-Object { $_ -eq $task }).EstimateMinutes = $estimateMinutes
+                            }
+                            if (![string]::IsNullOrWhiteSpace($newDescription)) {
+                                ($TaskList | Where-Object { $_ -eq $task }).Description = $newDescription.Trim()
+                            }
+                            Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
+                            $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
                         }
-                        if (![string]::IsNullOrWhiteSpace($newDescription)) {
-                            ($TaskList | Where-Object { $_ -eq $task }).Description = $newDescription.Trim()
+                        else {
+                            $MessageList.Add('Cannot edit a completed task.')
                         }
-                        Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
-                        $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
                     }
                     else {
                         $MessageList.Add("Invalid task index: $($tempIndex)")
@@ -325,9 +329,14 @@ function Start-WhatToDo {
                     $currentTasks = ($TaskList | Where-Object { (Get-Date $_.DueDate).Date -eq (Get-Date $ListDate).Date })
                     if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                         $task = [PSCustomObject]$currentTasks[$tempIndex-1]
-                        ($TaskList | Where-Object { $_ -eq $task }).DueDate = $newDueDate
-                        Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
-                        $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
+                        if (!$task.Completed) {
+                            ($TaskList | Where-Object { $_ -eq $task }).DueDate = $newDueDate
+                            Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
+                            $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
+                        }
+                        else {
+                            $MessageList.Add('Cannot move a completed task.')
+                        }
                     }
                     else {
                         $MessageList.Add("Invalid task index: $($tempIndex)")
@@ -339,9 +348,14 @@ function Start-WhatToDo {
                     $currentTasks = ($TaskList | Where-Object { (Get-Date $_.DueDate).Date -eq (Get-Date $ListDate).Date })
                     if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                         $task = [PSCustomObject]$currentTasks[$tempIndex-1]
-                        ($TaskList | Where-Object { $_ -eq $task }).DueDate = $newDueDate
-                        Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
-                        $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
+                        if (!$task.Completed) {
+                            ($TaskList | Where-Object { $_ -eq $task }).DueDate = $newDueDate
+                            Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
+                            $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
+                        }
+                        else {
+                            $MessageList.Add('Cannot move a completed task.')
+                        }
                     }
                     else {
                         $MessageList.Add("Invalid task index: $($tempIndex)")
@@ -364,9 +378,14 @@ function Start-WhatToDo {
                     $currentTasks = ($TaskList | Where-Object { (Get-Date $_.DueDate).Date -eq (Get-Date $ListDate).Date })
                     if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
                         $task = [PSCustomObject]$currentTasks[$tempIndex-1]
-                        ($TaskList | Where-Object { $_ -eq $task }).DueDate = $newDueDate
-                        Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
-                        $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
+                        if (!$task.Completed) {
+                            ($TaskList | Where-Object { $_ -eq $task }).DueDate = $newDueDate
+                            Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
+                            $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
+                        }
+                        else {
+                            $MessageList.Add('Cannot move a completed task.')
+                        }
                     }
                     else {
                         $MessageList.Add("Invalid task index: $($tempIndex)")
