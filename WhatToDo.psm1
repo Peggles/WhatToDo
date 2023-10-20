@@ -8,34 +8,40 @@ function Start-WhatToDo {
         [string]$ConfigurationPath
     )
 
-    $ScriptConfig = Import-PowerShellDataFile -Path $ConfigurationPath -ErrorAction Stop
-    $ExitScript = $false
-    $MessageList = [System.Collections.Generic.List[string]]@()
-    $ListDate = Get-Date
-    $TaskList = New-Object -TypeName 'System.Collections.ArrayList'
-    $TaskList = [System.Collections.ArrayList](Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate)
+    try {
+        $ScriptConfig = Import-PowerShellDataFile -Path $ConfigurationPath -ErrorAction Stop
+        $ExitScript = $false
+        $MessageList = [System.Collections.Generic.List[string]]@()
+        $ListDate = Get-Date
+        $TaskList = New-Object -TypeName 'System.Collections.ArrayList'
+        $TaskList = [System.Collections.ArrayList](Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate)
 
-    if ($ScriptConfig.BackupTaskListFileOncePerDayOnStartup) {
-        Backup-WhatToDoTasks -SourceFilePath $ScriptConfig.TaskListFile
-    }
+        if ($ScriptConfig.BackupTaskListFileOncePerDayOnStartup) {
+            Backup-WhatToDoTasks -SourceFilePath $ScriptConfig.TaskListFile
+        }
 
-    $recurringTasksAddedCount = 0
-    $recurringTasksDays = 7
-    for ($i = 0; $i -le $recurringTasksDays; $i++) {
-        $recurringTasks = Get-WhatToDoRecurringTasks -TaskList $TaskList -RecurringTasksConfig $ScriptConfig.RecurringTasks -Date (Get-Date).AddDays($i)
-        if (($recurringTasks | Measure-Object).Count -gt 0) {
-                $recurringTasks | ForEach-Object {
-                $tempTask = $_
-                if ((($TaskList | Where-Object { ($_.Description -eq $tempTask.Description) -and ($_.DueDate -eq $tempTask.DueDate) }) | Measure-Object).Count -eq 0) {
-                    [void]$TaskList.Add($tempTask)
-                    $recurringTasksAddedCount++
+        $recurringTasksAddedCount = 0
+        $recurringTasksDays = 7
+        for ($i = 0; $i -le $recurringTasksDays; $i++) {
+            $recurringTasks = Get-WhatToDoRecurringTasks -TaskList $TaskList -RecurringTasksConfig $ScriptConfig.RecurringTasks -Date (Get-Date).AddDays($i)
+            if (($recurringTasks | Measure-Object).Count -gt 0) {
+                    $recurringTasks | ForEach-Object {
+                    $tempTask = $_
+                    if ((($TaskList | Where-Object { ($_.Description -eq $tempTask.Description) -and ($_.DueDate -eq $tempTask.DueDate) }) | Measure-Object).Count -eq 0) {
+                        [void]$TaskList.Add($tempTask)
+                        $recurringTasksAddedCount++
+                    }
                 }
+                Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
             }
-            Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
+        }
+        if ($recurringTasksAddedCount -gt 0) {
+            $MessageList.Add("Added $($recurringTasksAddedCount) recurring task(s) from today to $(((Get-Date).AddDays($recurringTasksDays)).DayOfWeek.ToString().ToLower()) $(Get-Date (Get-Date).AddDays($recurringTasksDays) -Format 'd\/M').")
         }
     }
-    if ($recurringTasksAddedCount -gt 0) {
-        $MessageList.Add("Added $($recurringTasksAddedCount) recurring task(s) from today to $(((Get-Date).AddDays($recurringTasksDays)).DayOfWeek.ToString().ToLower()) $(Get-Date (Get-Date).AddDays($recurringTasksDays) -Format 'd\/M').")
+    catch {
+        Write-Error $Error[0]
+        Read-Host 'Press <Enter> to continue'
     }
 
     while (!$ExitScript) {
