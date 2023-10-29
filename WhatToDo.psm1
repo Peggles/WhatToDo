@@ -48,9 +48,9 @@ function Start-WhatToDo {
         try {
             Clear-Host
 
-            if ((Get-Date $ListDate).Date -eq (Get-Date).Date) { $dateColor = 'Cyan' }
-            elseif ((Get-Date $ListDate).Date -lt (Get-Date).Date) { $dateColor = 'Red' }
-            elseif ((Get-Date $ListDate).Date -gt (Get-Date).Date) { $dateColor = 'Yellow' }
+            if ((Get-Date $ListDate).Date -eq (Get-Date).Date) { $dateColor = 'Green' }
+            elseif ((Get-Date $ListDate).Date -lt (Get-Date).Date) { $dateColor = 'Yellow' }
+            elseif ((Get-Date $ListDate).Date -gt (Get-Date).Date) { $dateColor = 'Cyan' }
 
             if ((Get-Date $ListDate).Date -eq (Get-Date).Date) { Write-Host 'Today ' -NoNewline }
             elseif ((Get-Date $ListDate).Date -eq (Get-Date).Date.AddDays(1)) { Write-Host 'Tomorrow ' -NoNewline }
@@ -419,17 +419,17 @@ function Start-WhatToDo {
                     } | Sort-Object -Property DueDate, Priority, CreationDate, Description
 
                     if (($futureTasks | Measure-Object).Count -gt 0) {
-                        Write-Host "Upcoming tasks [$(($futureTasks | Measure-Object).Count)]" -ForegroundColor DarkCyan
+                        Write-Host "Upcoming tasks [$(($futureTasks | Measure-Object).Count)]" -ForegroundColor Yellow
                         $futureTasks | ForEach-Object {
                             if ((Get-Date $_.DueDate).Date -eq (Get-Date).Date.AddDays(1)) {
                                 Write-Host '- ' -NoNewline -ForegroundColor Gray
                                 Write-Host "$($_.Description)" -NoNewline
-                                Write-Host " (Tomorrow, $((Get-Date $_.DueDate).DayOfWeek.ToString().Substring(0, 3)) $(Get-Date $_.DueDate -Format 'd\/M'))" -ForegroundColor Yellow
+                                Write-Host " (Tomorrow $(Get-Date $_.DueDate -Format 'd\/M'))" -ForegroundColor Cyan
                             }
                             else {
                                 Write-Host '- ' -NoNewline -ForegroundColor Gray
                                 Write-Host "$($_.Description)" -NoNewline
-                                Write-Host " ($((Get-Date $_.DueDate).DayOfWeek.ToString().Substring(0, 3)) $(Get-Date $_.DueDate -Format 'd\/M'))" -ForegroundColor DarkYellow
+                                Write-Host " ($((Get-Date $_.DueDate).DayOfWeek.ToString().Substring(0, 3)) $(Get-Date $_.DueDate -Format 'd\/M'))" -ForegroundColor DarkCyan
                             }
                         }
                     }
