@@ -1,3 +1,7 @@
+# @('Public', 'Private') | ForEach-Object {
+#     Get-ChildItem -Path (Join-Path -Path $PSScriptRoot -ChildPath $_) -Include '*.ps1'
+# }
+
 function Start-WhatToDo {
     param(
         [Parameter(Mandatory)]
@@ -40,7 +44,7 @@ function Start-WhatToDo {
         }
     }
     catch {
-        Write-Error $Error[0]
+        Write-Error $PSItem
         Read-Host 'Press <Enter> to continue'
     }
 
@@ -96,7 +100,8 @@ function Start-WhatToDo {
             $TaskList | Where-Object { $_.DueDate.Date -eq $ListDate.Date } | ForEach-Object {
                 $index++
                 Write-Host '[' -NoNewline -ForegroundColor DarkGray
-                Write-Host $index -NoNewline -ForegroundColor Gray
+                $numberColor = $_.Completed ? 'DarkGray' : 'Gray'
+                Write-Host $index -NoNewline -ForegroundColor $numberColor
                 Write-Host '] ' -NoNewline -ForegroundColor DarkGray
 
                 $estimateHours = [Math]::Floor($_.EstimateMinutes / 60)
@@ -367,6 +372,25 @@ function Start-WhatToDo {
                         $MessageList.Add("Invalid task index: $($tempIndex)")
                     }
                 }
+                elseif ($UserCommand -match '^move (\d+) (\d{1,2})/(\d{1,2})$') {
+                    $tempIndex = [int]$Matches.1
+                    $newDueDate = Get-Date -Day $Matches.2 -Month $Matches.3
+                    $currentTasks = ($TaskList | Where-Object { (Get-Date $_.DueDate).Date -eq (Get-Date $ListDate).Date })
+                    if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
+                        $task = [PSCustomObject]$currentTasks[$tempIndex-1]
+                        if (!$task.Completed) {
+                            ($TaskList | Where-Object { $_ -eq $task }).DueDate = $newDueDate
+                            Save-WhatToDoTaskList -TaskList $TaskList -FilePath $ScriptConfig.TaskListFile
+                            $TaskList = Import-WhatToDoTaskList -Path $ScriptConfig.TaskListFile -Date $ListDate
+                        }
+                        else {
+                            $MessageList.Add('Cannot move a completed task.')
+                        }
+                    }
+                    else {
+                        $MessageList.Add("Invalid task index: $($tempIndex)")
+                    }
+                }
                 elseif ($UserCommand -match '^move (\d+)$') {
                     $tempIndex = [int]$Matches.1
                     $moveDays = 0
@@ -403,12 +427,38 @@ function Start-WhatToDo {
                 elseif ($UserCommand -match '^load (\d{1,2})$') {
                     $ListDate = Get-Date -Day $Matches.1
                 }
+                elseif ($UserCommand -match '^load (\d{1,2})/(\d{1,2})$') {
+                    $ListDate = Get-Date -Day $Matches.1 -Month $Matches.2
+                }
                 elseif ($UserCommand -match '^load (\+|\-{1})(\d+)$') {
                     $shiftDays = [int]($Matches.1 + [int]$Matches.2)
                     $ListDate = (Get-Date $ListDate).AddDays($shiftDays)
                 }
                 elseif ($UserCommand -eq 'load') {
                     $ListDate = Get-Date
+                }
+                elseif ($UserCommand -match '^info (\d+)$') {
+                    $tempIndex = [int]$Matches.1
+                    $currentTasks = ($TaskList | Where-Object { (Get-Date $_.DueDate).Date -eq (Get-Date $ListDate).Date })
+                    if (($tempIndex -ge 1) -and ($tempIndex -le ($currentTasks | Measure-Object).Count)) {
+                        $task = [PSCustomObject]$currentTasks[$tempIndex-1]
+                        Write-Host $task.Description -ForegroundColor Cyan
+                        Write-Host "Priority: $($task.Priority)" -ForegroundColor Yellow
+                        Write-Host "Estimate minutes: $($task.EstimateMinutes)" -ForegroundColor Yellow
+                        Write-Host "Created: $(Get-Date $task.CreationDate -Format 'yyyy-MM-dd')"
+                        Write-Host "Due: $(Get-Date $task.DueDate -Format 'yyyy-MM-dd')" -ForegroundColor Red
+                        if ($task.Completed) {
+                            Write-Host "Completed: $(Get-Date $task.CreationDate -Format 'yyyy-MM-dd')" -ForegroundColor Green
+                        }
+                        else {
+                            Write-Host 'Completed: Not yet' -ForegroundColor Green
+                        }
+                        Write-Host
+                        Read-Host 'Press <Enter> to exit task details view'
+                    }
+                    else {
+                        $MessageList.Add("Invalid task index: $($tempIndex)")
+                    }
                 }
                 elseif (($UserCommand -eq 'calendar') -or ($UserCommand -eq 'cal')) {
                     $futureDays = 7
@@ -515,6 +565,11 @@ function Start-WhatToDo {
                     Write-Host 'load' -NoNewline
                     Write-Host " # Load today's task list." -ForegroundColor DarkGreen
 
+                    Write-Host "`n# Show details about a task" -ForegroundColor DarkYellow
+                    Write-Host 'Syntax: info <index>' -ForegroundColor DarkGray
+                    Write-Host 'info 3' -NoNewline
+                    Write-Host ' # Show details about task number 3.' -ForegroundColor DarkGreen
+
                     Write-Host "`n# View calendar and upcoming tasks" -ForegroundColor DarkYellow
                     Write-Host 'calendar'
                     Write-Host 'cal'
@@ -540,7 +595,7 @@ function Start-WhatToDo {
             Write-Host
         }
         catch {
-            Write-Error $Error[0]
+            Write-Error $PSItem
             Read-Host 'Press <Enter> to continue'
         }
     }
@@ -580,7 +635,7 @@ function Import-WhatToDoTaskList {
                 }
             }
             catch {
-                throw "Failed to import un-completed task. $($Error[0])"
+                throw "Failed to import un-completed task. $($PSItem)"
             }
         }
         elseif ($_ -match '^x \(([A-Z])\) (\d{4}-\d{2}-\d{2}) (\d{4}-\d{2}-\d{2}) (.+) est:(\d+) due:(\d{4}-\d{2}-\d{2})$') {
@@ -605,7 +660,7 @@ function Import-WhatToDoTaskList {
                 }
             }
             catch {
-                throw "Failed to import completed task. $($Error[0])"
+                throw "Failed to import completed task. $($PSItem)"
             }
         }
     }
@@ -683,7 +738,7 @@ function Initialize-WhatToDo {
             New-Item -Path $configFilePath -ItemType File -Value $configFileContent -Confirm
         }
         catch {
-            throw "Failed to create configuration file in directory '$($DirectoryPath)'. $($Error[0])"
+            throw "Failed to create configuration file in directory '$($DirectoryPath)'. $($PSItem)"
         }
 
         if (!(Test-Path -Path $taskListFilePath)) {
@@ -691,7 +746,7 @@ function Initialize-WhatToDo {
                 New-Item -Path $taskListFilePath -ItemType File -Confirm
             }
             catch {
-                throw "Failed to create task list file in directory '$($DirectoryPath)'. $($Error[0])"
+                throw "Failed to create task list file in directory '$($DirectoryPath)'. $($PSItem)"
             }
         }
         else {
@@ -797,7 +852,7 @@ function Get-WhatToDoRecurringTasks {
                     })
                 }
                 catch {
-                    Write-Error "Failed to add recurring task. $($Error[0])"
+                    Write-Error "Failed to add recurring task. $($PSItem)"
                     Read-Host 'Press <Enter> to continue'
                 }
             }
@@ -823,7 +878,7 @@ function Backup-WhatToDoTasks {
             New-Item -Path $backupDirectoryPath -ItemType Directory
         }
         catch {
-            throw "Failed to create backup directory '$($backupDirectoryPath)'. $($Error[0])"
+            throw "Failed to create backup directory '$($backupDirectoryPath)'. $($PSItem)"
         }
     }
 
@@ -837,7 +892,7 @@ function Backup-WhatToDoTasks {
         }
     }
     catch {
-        Write-Error "Failed to backup tasks file '$($SourceFilePath)'. $($Error[0])"
+        Write-Error "Failed to backup tasks file '$($SourceFilePath)'. $($PSItem)"
         Read-Host 'Press <Enter> to continue'
     }
 }
