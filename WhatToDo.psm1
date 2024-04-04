@@ -446,12 +446,12 @@ function Start-WhatToDo {
                         Write-Host "Priority: $($task.Priority)" -ForegroundColor Yellow
                         Write-Host "Estimate minutes: $($task.EstimateMinutes)" -ForegroundColor Yellow
                         Write-Host "Created: $(Get-Date $task.CreationDate -Format 'yyyy-MM-dd')"
-                        Write-Host "Due: $(Get-Date $task.DueDate -Format 'yyyy-MM-dd')" -ForegroundColor Red
+                        Write-Host "Due: $(Get-Date $task.DueDate -Format 'yyyy-MM-dd')"
                         if ($task.Completed) {
-                            Write-Host "Completed: $(Get-Date $task.CreationDate -Format 'yyyy-MM-dd')" -ForegroundColor Green
+                            Write-Host "Completed: $(Get-Date $task.CompletionDate -Format 'yyyy-MM-dd')"
                         }
                         else {
-                            Write-Host 'Completed: Not yet' -ForegroundColor Green
+                            Write-Host 'Completed: Not yet'
                         }
                         Write-Host
                         Read-Host 'Press <Enter> to exit task details view'
@@ -527,29 +527,33 @@ function Start-WhatToDo {
                     Write-Host 'remove 1' -NoNewline
                     Write-Host " # Remove task number 1." -ForegroundColor DarkGreen
 
-                    Write-Host "`n# Complete a task" -ForegroundColor DarkYellow
+                    Write-Host "`n# Mark a task as completed" -ForegroundColor DarkYellow
                     Write-Host 'Syntax: done <index>' -ForegroundColor DarkGray
                     Write-Host 'done 4' -NoNewline
                     Write-Host " # Complete task number 4." -ForegroundColor DarkGreen
 
-                    Write-Host "`n# Un-complete a task" -ForegroundColor DarkYellow
+                    Write-Host "`n# Unmark a task as completed" -ForegroundColor DarkYellow
                     Write-Host 'Syntax: undone <index>' -ForegroundColor DarkGray
                     Write-Host 'undone 4' -NoNewline
                     Write-Host " # Un-complete task number 4." -ForegroundColor DarkGreen
 
                     Write-Host "`n# Move a task to another day" -ForegroundColor DarkYellow
                     Write-Host 'Syntax: move <index> <yyyy-mm-dd>' -ForegroundColor DarkGray
+                    Write-Host 'Syntax: move <index> <dd/mm>' -ForegroundColor DarkGray
                     Write-Host 'Syntax: move <index> <dd>' -ForegroundColor DarkGray
                     Write-Host 'Syntax: move <index>' -ForegroundColor DarkGray
                     Write-Host 'move 1 2024-01-25' -NoNewline
                     Write-Host ' # Move task number 1 to date 2024-01-25.' -ForegroundColor DarkGreen
                     Write-Host 'move 5 11' -NoNewline
+                    Write-Host ' # Move task number 2 to march 18.' -ForegroundColor DarkGreen
+                    Write-Host 'move 2 18/3' -NoNewline
                     Write-Host ' # Move task number 5 to day 11 (of current month).' -ForegroundColor DarkGreen
                     Write-Host 'move 3' -NoNewline
                     Write-Host ' # Move task number 3 to next workday.' -ForegroundColor DarkGreen
 
                     Write-Host "`n# Load a task list" -ForegroundColor DarkYellow
                     Write-Host 'Syntax: load <yyyy-mm-dd>' -ForegroundColor DarkGray
+                    Write-Host 'Syntax: load <dd/mm>' -ForegroundColor DarkGray
                     Write-Host 'Syntax: load <dd>' -ForegroundColor DarkGray
                     Write-Host 'Syntax: load +<days>' -ForegroundColor DarkGray
                     Write-Host 'Syntax: load -<days>' -ForegroundColor DarkGray
@@ -557,6 +561,8 @@ function Start-WhatToDo {
                     Write-Host 'load 2024-01-25' -NoNewline
                     Write-Host ' # Load task list for date 2024-01-25.' -ForegroundColor DarkGreen
                     Write-Host 'load 17' -NoNewline
+                    Write-Host ' # Load task list for september 20.' -ForegroundColor DarkGreen
+                    Write-Host 'load 20/9' -NoNewline
                     Write-Host ' # Load task list for day 17 (of current month).' -ForegroundColor DarkGreen
                     Write-Host 'load +1' -NoNewline
                     Write-Host " # Load next day's task list (relative to currently loaded task list)." -ForegroundColor DarkGreen
