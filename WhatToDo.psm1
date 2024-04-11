@@ -530,12 +530,12 @@ function Start-WhatToDo {
                     Write-Host "`n# Mark a task as completed" -ForegroundColor DarkYellow
                     Write-Host 'Syntax: done <index>' -ForegroundColor DarkGray
                     Write-Host 'done 4' -NoNewline
-                    Write-Host " # Complete task number 4." -ForegroundColor DarkGreen
+                    Write-Host " # Mark task number 4 as completed." -ForegroundColor DarkGreen
 
-                    Write-Host "`n# Unmark a task as completed" -ForegroundColor DarkYellow
+                    Write-Host "`n# Mark a task as not completed" -ForegroundColor DarkYellow
                     Write-Host 'Syntax: undone <index>' -ForegroundColor DarkGray
                     Write-Host 'undone 4' -NoNewline
-                    Write-Host " # Un-complete task number 4." -ForegroundColor DarkGreen
+                    Write-Host " # Mark task number 4 as not completed." -ForegroundColor DarkGreen
 
                     Write-Host "`n# Move a task to another day" -ForegroundColor DarkYellow
                     Write-Host 'Syntax: move <index> <yyyy-mm-dd>' -ForegroundColor DarkGray
@@ -544,10 +544,10 @@ function Start-WhatToDo {
                     Write-Host 'Syntax: move <index>' -ForegroundColor DarkGray
                     Write-Host 'move 1 2024-01-25' -NoNewline
                     Write-Host ' # Move task number 1 to date 2024-01-25.' -ForegroundColor DarkGreen
-                    Write-Host 'move 5 11' -NoNewline
-                    Write-Host ' # Move task number 2 to march 18.' -ForegroundColor DarkGreen
                     Write-Host 'move 2 18/3' -NoNewline
-                    Write-Host ' # Move task number 5 to day 11 (of current month).' -ForegroundColor DarkGreen
+                    Write-Host ' # Move task number 2 to march 18.' -ForegroundColor DarkGreen
+                    Write-Host 'move 5 11' -NoNewline
+                    Write-Host ' # Move task number 5 to day 11 of current month.' -ForegroundColor DarkGreen
                     Write-Host 'move 3' -NoNewline
                     Write-Host ' # Move task number 3 to next workday.' -ForegroundColor DarkGreen
 
@@ -560,10 +560,10 @@ function Start-WhatToDo {
                     Write-Host 'Syntax: load' -ForegroundColor DarkGray
                     Write-Host 'load 2024-01-25' -NoNewline
                     Write-Host ' # Load task list for date 2024-01-25.' -ForegroundColor DarkGreen
-                    Write-Host 'load 17' -NoNewline
-                    Write-Host ' # Load task list for september 20.' -ForegroundColor DarkGreen
                     Write-Host 'load 20/9' -NoNewline
-                    Write-Host ' # Load task list for day 17 (of current month).' -ForegroundColor DarkGreen
+                    Write-Host ' # Load task list for september 20.' -ForegroundColor DarkGreen
+                    Write-Host 'load 17' -NoNewline
+                    Write-Host ' # Load task list for day 17 of current month.' -ForegroundColor DarkGreen
                     Write-Host 'load +1' -NoNewline
                     Write-Host " # Load next day's task list (relative to currently loaded task list)." -ForegroundColor DarkGreen
                     Write-Host 'load -3' -NoNewline
