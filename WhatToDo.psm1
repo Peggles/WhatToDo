@@ -620,7 +620,7 @@ function Import-WhatToDoTaskList {
     $tempTaskList = New-Object -TypeName 'System.Collections.ArrayList'
 
     Get-Content -Path $Path | ForEach-Object {
-        if ($_ -match '^\(([A-Z])\) (\d{4}-\d{2}-\d{2}) (.+) est:(\d+) due:(\d{4}-\d{2}-\d{2})$') {
+        if ($_ -match '^\(([A-Z])\) (\d{4}-\d{2}-\d{2}) (.+) estimateminutes:(\d+) duedate:(\d{4}-\d{2}-\d{2})$') {
             try {
                 $priority = $Matches.1
                 $creationDate = $Matches.2
@@ -644,7 +644,7 @@ function Import-WhatToDoTaskList {
                 throw "Failed to import un-completed task. $($PSItem)"
             }
         }
-        elseif ($_ -match '^x \(([A-Z])\) (\d{4}-\d{2}-\d{2}) (\d{4}-\d{2}-\d{2}) (.+) est:(\d+) due:(\d{4}-\d{2}-\d{2})$') {
+        elseif ($_ -match '^x \(([A-Z])\) (\d{4}-\d{2}-\d{2}) (\d{4}-\d{2}-\d{2}) (.+) estimateminutes:(\d+) duedate:(\d{4}-\d{2}-\d{2})$') {
             try {
                 $priority = $Matches.1
                 $completionDate = $Matches.2
@@ -688,10 +688,10 @@ function Save-WhatToDoTaskList {
     if (($TaskList | Measure-Object).Count -gt 0) {
         $TaskList | Sort-Object -Property Completed, Priority, EstimateMinutes, CreationDate, Description | Where-Object { $_.Description.Length -gt 0 } | ForEach-Object {
             if ($_.Completed) {
-                $content += "x ($($_.Priority)) $(Get-Date $_.CompletionDate -Format 'yyyy-MM-dd') $(Get-Date $_.CreationDate -Format 'yyyy-MM-dd') $($_.Description) est:$($_.EstimateMinutes) due:$(Get-Date $_.DueDate -Format 'yyyy-MM-dd')`n"
+                $content += "x ($($_.Priority)) $(Get-Date $_.CompletionDate -Format 'yyyy-MM-dd') $(Get-Date $_.CreationDate -Format 'yyyy-MM-dd') $($_.Description) estimateminutes:$($_.EstimateMinutes) duedate:$(Get-Date $_.DueDate -Format 'yyyy-MM-dd')`n"
             }
             else {
-                $content += "($($_.Priority)) $(Get-Date $_.CreationDate -Format 'yyyy-MM-dd') $($_.Description) est:$($_.EstimateMinutes) due:$(Get-Date $_.DueDate -Format 'yyyy-MM-dd')`n"
+                $content += "($($_.Priority)) $(Get-Date $_.CreationDate -Format 'yyyy-MM-dd') $($_.Description) estimateminutes:$($_.EstimateMinutes) duedate:$(Get-Date $_.DueDate -Format 'yyyy-MM-dd')`n"
             }
         }
     }
