@@ -25,7 +25,7 @@ function Start-WhatToDo {
         }
 
         $recurringTasksAddedCount = 0
-        $recurringTasksDays = 7
+        $recurringTasksDays = $ScriptConfig.NumberOfRecurringTaskDaysToAddBeforehand
         for ($i = 0; $i -le $recurringTasksDays; $i++) {
             $recurringTasks = Get-WhatToDoRecurringTasks -TaskList $TaskList -RecurringTasksConfig $ScriptConfig.RecurringTasks -Date (Get-Date).AddDays($i)
             if (($recurringTasks | Measure-Object).Count -gt 0) {
@@ -79,7 +79,7 @@ function Start-WhatToDo {
 
             if (($overdueTasks | Measure-Object).Count -gt 0) {
                 Write-Host ('-' * 20) -ForegroundColor DarkGray
-                Write-Host "Overdue tasks [$(($overdueTasks | Measure-Object).Count)]" -ForegroundColor Red
+                Write-Host "Overdue tasks ($(($overdueTasks | Measure-Object).Count))" -ForegroundColor Red
 
                 $overdueTasks | Where-Object { $_.Description.Length -gt 0 } | ForEach-Object {
                     Write-Host '- ' -NoNewline -ForegroundColor Gray
@@ -461,7 +461,7 @@ function Start-WhatToDo {
                     }
                 }
                 elseif (($UserCommand -eq 'calendar') -or ($UserCommand -eq 'cal')) {
-                    $futureDays = 7
+                    $futureDays = $ScriptConfig.CalendarFutureDaysToShow
                     $futureTasks = $TaskList | Where-Object {
                         ($_.DueDate.Date -gt (Get-Date)) -and
                         ($_.DueDate -le (Get-Date).AddDays($futureDays)) -and
@@ -469,7 +469,7 @@ function Start-WhatToDo {
                     } | Sort-Object -Property DueDate, Priority, CreationDate, Description
 
                     if (($futureTasks | Measure-Object).Count -gt 0) {
-                        Write-Host "Upcoming tasks [$(($futureTasks | Measure-Object).Count)]" -ForegroundColor Yellow
+                        Write-Host "Upcoming tasks ($(($futureTasks | Measure-Object).Count))" -ForegroundColor Yellow
                         $futureTasks | ForEach-Object {
                             if ((Get-Date $_.DueDate).Date -eq (Get-Date).Date.AddDays(1)) {
                                 Write-Host '- ' -NoNewline -ForegroundColor Gray
@@ -487,7 +487,7 @@ function Start-WhatToDo {
                         Write-Host "No upcoming tasks next $($futureDays) days." -ForegroundColor DarkGray
                     }
 
-                    if ($ScriptConfig.UsePSCalendarModule) {
+                    if ($ScriptConfig.UsePSCalendarModule -and (Get-Command -Name 'Get-Calendar' -ErrorAction SilentlyContinue)) {
                         Write-Host
                         $highlightDates = @()
                         $TaskList | Where-Object {
@@ -698,6 +698,47 @@ function Save-WhatToDoTaskList {
     Set-Content -Path $FilePath -Value $content.Trim() -Encoding 'utf8'
 }
 
+function New-WhatToDoTask {
+    param(
+        [Parameter(Mandatory)]
+        [ValidateScript({
+            if (Test-Path -Path $_ -PathType Leaf) { return $true }
+            else { throw [System.IO.FileNotFoundException] "Cannot find the file '$($_)'." }
+        })]
+        [string]$TaskListFilePath,
+        [Parameter(Mandatory)]
+        [ValidateNotNull()]
+        [string]$Priority,
+        [Parameter(Mandatory)]
+        [ValidateNotNull()]
+        [int]$EstimateMinutes,
+        [Parameter(Mandatory)]
+        [ValidateNotNull()]
+        [string]$Description,
+        [Parameter(Mandatory)]
+        [ValidateNotNull()]
+        [DateTime]$DueDate
+    )
+
+    $TaskList = Import-WhatToDoTaskList -Path $TaskListFilePath -Date $DueDate
+
+    # Convert task list to array list and sort it (if it contains more than one task, otherwise skip conversion).
+    if (($TaskList | Measure-Object).Count -gt 1) {
+        $TaskList = [System.Collections.ArrayList]$TaskList
+    }
+
+    [void]$TaskList.Add([PSCustomObject]@{
+        Priority = $Priority.ToUpper()
+        EstimateMinutes = $EstimateMinutes
+        Description = $Description.Trim()
+        CreationDate = (Get-Date)
+        DueDate = $DueDate
+    })
+
+    Save-WhatToDoTaskList -TaskList $TaskList -FilePath $TaskListFilePath
+}
+Export-ModuleMember -Function New-WhatToDoTask
+
 function Initialize-WhatToDo {
     param(
         [Parameter(Mandatory)]
@@ -717,6 +758,8 @@ function Initialize-WhatToDo {
     TaskListFile = '$($taskListFilePath)'
     BackupTaskListFileOncePerDayOnStartup = $false
     UsePSCalendarModule = $false
+    CalendarFutureDaysToShow = 7
+    NumberOfRecurringTaskDaysToAddBeforehand = 14
 
     RecurringTasks = @(
         <#@{
